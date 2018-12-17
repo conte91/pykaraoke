@@ -713,7 +713,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
             # Sequence number (discarded)
             packet = filehdl.read(2)
             bytesRead = bytesRead + 2
-            zero, type = list(map(ord, packet))
+            zero, type = packet
             if type == 0x02:
                 # Discard next two bytes as well
                 discard = filehdl.read(2)
@@ -848,7 +848,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
             # Key signature (discard)
             packet = filehdl.read(3)
             bytesRead = bytesRead + 3
-            valid, sf, mi = list(map(ord, packet))
+            valid, sf, mi = packet
             if valid != 0x02:
                 print(("Error: Invalid key signature (valid=%d, sf=%d, mi=%d)" % (valid,sf,mi)))
         elif event == 0x7F:
@@ -902,7 +902,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
         packet = filehdl.read(2)
         bytesRead = bytesRead + 2
         if debug:
-            c, v = list(map(ord, packet))
+            c, v = packet
             print(("Control: C%d V%d" % (c,v)))
     elif (event_type & 0xF0) == 0xC0:
         # Program (patch) change (discard)

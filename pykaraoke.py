@@ -1770,9 +1770,10 @@ class SongStructDataObject(wx.DataObjectSimple):
         reserve space before calling GetDataHere()."""
         return len(self.data)
 
-    def GetDataHere(self):
+    def GetDataHere(self, buf):
         """Returns the data in the object, encoded as a string. """
-        return self.data
+        buf[:] = self.data
+        return True
 
     def SetData(self, data):
         """Accepts new data in the object, represented as a string. """
