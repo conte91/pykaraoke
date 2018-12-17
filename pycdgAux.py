@@ -148,13 +148,13 @@ class CdgPacketReader:
         self.__cdgSurfarray = N.zeros((CDG_FULL_WIDTH, CDG_FULL_HEIGHT))
 
         # Start with all tiles requiring update
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
 
     def MarkTilesDirty(self):
         """ Marks all the tiles dirty, so that the next call to
         GetDirtyTiles() will return the complete list of tiles. """
         
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
 
     def GetDirtyTiles(self):
         """ Returns a list of (row, col) tuples, corresponding to all
@@ -219,7 +219,7 @@ class CdgPacketReader:
 
     # Read the next CDG command from the file (24 bytes each)
     def __getNextPacket(self):
-        packetData = map(ord, self.__cdgData[self.__cdgDataPos : self.__cdgDataPos + 24])
+        packetData = list(map(ord, self.__cdgData[self.__cdgDataPos : self.__cdgDataPos + 24]))
         self.__cdgDataPos += 24
         if (len(packetData) == 24):
             return CdgPacket(packetData)
@@ -307,7 +307,7 @@ class CdgPacketReader:
         self.__cdgSurfarray = N.zeros([CDG_FULL_WIDTH, CDG_FULL_HEIGHT])
         self.__cdgSurfarray[:,:] = self.__cdgSurfarray[:,:] + self.__cdgColourTable[colour]
 
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
 
     # Border Preset (clear the border area only) 
     def __cdgBorderPreset (self, packd):
@@ -380,7 +380,7 @@ class CdgPacketReader:
             # Changing the screen shift.
             self.__hOffset = min(hOffset, 5)
             self.__vOffset = min(vOffset, 11)
-            self.__updatedTiles = 0xFFFFFFFFL
+            self.__updatedTiles = 0xFFFFFFFF
 
         if hScrollLeftPixels == 0 and \
            hScrollRightPixels == 0 and \
@@ -428,7 +428,7 @@ class CdgPacketReader:
         
         # We have modified our local cdgSurfarray. This will be blitted to
         # the screen by cdgDisplayUpdate()
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
 
     # Set one of the colour indeces as transparent. Don't actually do anything with this
     # at the moment, as there is currently no mechanism for overlaying onto a movie file.
@@ -469,7 +469,7 @@ class CdgPacketReader:
         #self.__cdgSurfarray.flat[:] =  map(self.__cdgColourTable.__getitem__, self.__cdgPixelColours.flat)
 
         # Update the screen for any colour changes
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
         return
 
     # Set the colours for a 12x6 tile. The main CDG command for display data

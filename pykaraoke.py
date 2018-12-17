@@ -129,20 +129,14 @@
 
 import sys
 
-# Ensure that we have at least wx version 2.6, but also protect
-# wxversion against py2exe (wxversion requires actual wx directories
-# on-disk, so it doesn't work in the py2exe-compiled version used for
-# Windows distribution).
-if not hasattr(sys, 'frozen'):
-    import wxversion
-    wxversion.ensureMinimal('2.6')
+import wx
 
 import os, string, wx, time, copy, types
 from pykconstants import *
 from pykenv import env
 import pycdg, pympg, pykar, pykversion, pykdb
 import codecs
-import cPickle
+import pickle
 from pykmanager import manager
 import random
 import performer_prompt as PerformerPrompt
@@ -169,7 +163,7 @@ class wxBusyCancelDialog(wx.ProgressDialog, pykdb.BusyCancelDialog):
         """ Called from time to time to update the progress display. """
 
         cont = self.Update(int(progress * 100), label)
-        if isinstance(cont, types.TupleType):
+        if isinstance(cont, tuple):
             # Later versions of wxPython return a tuple from the above.
             cont, skip = cont
 
@@ -198,8 +192,8 @@ class DatabaseSetupWindow (wx.Frame):
             self.FolderList.Append(item)
 
         # Add the buttons
-        self.AddFolderButtonID = wx.NewId()
-        self.DelFolderButtonID = wx.NewId()
+        self.AddFolderButtonID = wx.NewIdRef()
+        self.DelFolderButtonID = wx.NewIdRef()
         self.AddFolderButton = wx.Button(self.panel, self.AddFolderButtonID, "Add Folder")
         self.DelFolderButton = wx.Button(self.panel, self.DelFolderButtonID, "Delete Folder")
         self.FolderButtonsSizer = wx.BoxSizer(wx.VERTICAL)
@@ -214,7 +208,7 @@ class DatabaseSetupWindow (wx.Frame):
         self.FolderSizer.Add (self.FolderButtonsSizer, 0, wx.ALL, 3)
 
         # Create the settings controls
-        self.FileExtensionID = wx.NewId()
+        self.FileExtensionID = wx.NewIdRef()
         self.FiletypesText = wx.StaticText (self.panel, wx.ID_ANY, "Include File Types: ")
         self.FiletypesSizer = wx.BoxSizer (wx.HORIZONTAL)
 
@@ -229,7 +223,7 @@ class DatabaseSetupWindow (wx.Frame):
         wx.EVT_CHECKBOX (self, self.FileExtensionID, self.OnFileExtChanged)
 
         # Create the ZIP file setting checkbox
-        self.zipID = wx.NewId()
+        self.zipID = wx.NewIdRef()
         self.zipText = wx.StaticText (self.panel, wx.ID_ANY, "Look Inside ZIPs: ")
         self.zipCheckBox = wx.CheckBox(self.panel, self.zipID, "Enabled")
         self.zipCheckBox.SetValue(settings.LookInsideZips)
@@ -238,7 +232,7 @@ class DatabaseSetupWindow (wx.Frame):
         wx.EVT_CHECKBOX (self, self.zipID, self.OnZipChanged)
 
         # Create the titles.txt file setting checkbox
-        self.titlesID = wx.NewId()
+        self.titlesID = wx.NewIdRef()
         self.titlesText = wx.StaticText (self.panel, wx.ID_ANY, "Read titles.txt files: ")
         self.titlesCheckBox = wx.CheckBox(self.panel, self.titlesID, "Enabled")
         self.titlesCheckBox.SetValue(self.KaraokeMgr.SongDB.Settings.ReadTitlesTxt)
@@ -267,13 +261,13 @@ class DatabaseSetupWindow (wx.Frame):
 
         # Create the scan folders button
         self.ScanText = wx.StaticText (self.panel, wx.ID_ANY, "Rescan all folders: ")
-        self.ScanFoldersButtonID = wx.NewId()
+        self.ScanFoldersButtonID = wx.NewIdRef()
         self.ScanFoldersButton = wx.Button(self.panel, self.ScanFoldersButtonID, "Scan Now")
         wx.EVT_BUTTON(self, self.ScanFoldersButtonID, self.OnScanFoldersClicked)
 
         # Create the save settings button
         self.SaveText = wx.StaticText (self.panel, wx.ID_ANY, "Save settings and song database: ")
-        self.SaveSettingsButtonID = wx.NewId()
+        self.SaveSettingsButtonID = wx.NewIdRef()
         self.SaveSettingsButton = wx.Button(self.panel, self.SaveSettingsButtonID, "Save and Close")
         wx.EVT_BUTTON(self, self.SaveSettingsButtonID, self.OnSaveSettingsClicked)
 
@@ -400,7 +394,7 @@ class DatabaseSetupWindow (wx.Frame):
     # User changed a checkbox, just do them all again
     def OnFileExtChanged(self, event):
         ignored_ext_list = []
-        for ext, cb in self.extCheckBoxes.items():
+        for ext, cb in list(self.extCheckBoxes.items()):
             if not cb.IsChecked():
                 ignored_ext_list.append(ext)
         self.KaraokeMgr.SongDB.Settings.IgnoredExtensions = ignored_ext_list
@@ -619,7 +613,7 @@ class ConfigWindow (wx.Frame):
         gsizer.Add(text, flag = wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, border = 5)
         self.SampleRate = wx.ComboBox(
             panel, -1, value = str(settings.SampleRate),
-            choices = map(str, settings.SampleRates))
+            choices = list(map(str, settings.SampleRates)))
         gsizer.Add(self.SampleRate, flag = wx.EXPAND)
 
         text = wx.StaticText(panel, -1, "Buffer size (ms):")
@@ -681,7 +675,7 @@ class ConfigWindow (wx.Frame):
         gsizer.Add(text, flag = wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, border = 5)
         self.MIDISampleRate = wx.ComboBox(
             panel, -1, value = str(settings.MIDISampleRate),
-            choices = map(str, settings.SampleRates))
+            choices = list(map(str, settings.SampleRates)))
         gsizer.Add(self.MIDISampleRate, flag = wx.EXPAND)
         karsizer.Add(gsizer, flag = wx.EXPAND | wx.LEFT | wx.RIGHT, border = 10)
 
@@ -722,7 +716,7 @@ class ConfigWindow (wx.Frame):
         text = wx.StaticText(panel, -1, "Zoom:")
         hsizer.Add(text, flag = wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, border = 5)
         selection = settings.Zoom.index(settings.CdgZoom)
-        choices = map(lambda z: '%s: %s' % (z, settings.ZoomDesc[z]), settings.Zoom)
+        choices = ['%s: %s' % (z, settings.ZoomDesc[z]) for z in settings.Zoom]
         self.CdgZoom = wx.Choice(panel, -1, choices = choices)
         self.CdgZoom.SetSelection(selection)
         hsizer.Add(self.CdgZoom, flag = wx.EXPAND, proportion = 1)
@@ -740,7 +734,7 @@ class ConfigWindow (wx.Frame):
         # Scan song information from the file names.
         infoSizer = wx.BoxSizer(wx.VERTICAL)
         # Add checkbox for song-derivation enable/disable
-        self.SongInfoCheckBoxID = wx.NewId()
+        self.SongInfoCheckBoxID = wx.NewIdRef()
         self.SongInfoCheckBox = wx.CheckBox(panel, self.SongInfoCheckBoxID, "Derive song information from file names?")
         wx.EVT_CHECKBOX(self, self.SongInfoCheckBoxID, self.setSongInfoCheckBox)
         infoSizer.Add(self.SongInfoCheckBox, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL, border = 7)
@@ -1533,9 +1527,9 @@ class FileTree (wx.Panel):
         wx.EVT_TREE_ITEM_RIGHT_CLICK(self, wx.ID_ANY, self.OnRightClick)
 
         # Create IDs for popup menu
-        self.menuPlayId = wx.NewId()
-        self.menuPlaylistAddId = wx.NewId()
-        self.menuFileDetailsId = wx.NewId()
+        self.menuPlayId = wx.NewIdRef()
+        self.menuPlaylistAddId = wx.NewIdRef()
+        self.menuFileDetailsId = wx.NewIdRef()
 
         # Set up drag into the playlist
         self.FileTree.Bind(wx.EVT_TREE_BEGIN_DRAG, self.OnBeginDrag)
@@ -1613,7 +1607,7 @@ class FileTree (wx.Panel):
 
         # Populate the tree control, directories then files
         for item in dir_list:
-            if isinstance(item, types.StringType):
+            if isinstance(item, bytes):
                 item = item.decode(settings.FilesystemCoding)
             try:
                 node = self.FileTree.AppendItem(root_node, item, image=self.FolderClosedIconIndex)
@@ -1622,7 +1616,7 @@ class FileTree (wx.Panel):
 
             self.FileTree.SetItemHasChildren(node, True)
         for item in file_list:
-            if isinstance(item, types.StringType):
+            if isinstance(item, bytes):
                 item = item.decode(settings.FilesystemCoding)
             try:
                 node = self.FileTree.AppendItem(root_node, item, image=self.FileIconIndex)
@@ -1746,9 +1740,9 @@ class FileTree (wx.Panel):
 
 # This defines a custom "format" for our local drag-and-drop data
 # type: a list of SongStruct objects.
-songStructListFormat = wx.CustomDataFormat('SongStructList')
+songStructListFormat = wx.DataFormat('SongStructList')
 
-class SongStructDataObject(wx.PyDataObjectSimple):
+class SongStructDataObject(wx.DataObjectSimple):
     """This class is used to encapsulate a list of SongStruct objects,
     moving through the drag-and-drop system.  We use a custom
     DataObject class instead of using PyTextDataObject, so wxPython
@@ -1757,7 +1751,7 @@ class SongStructDataObject(wx.PyDataObjectSimple):
     string into the playlist window. """
 
     def __init__(self, songs = None, extra_data = None):
-        wx.PyDataObjectSimple.__init__(self)
+        wx.DataObjectSimple.__init__(self)
         self.SetFormat(songStructListFormat)
 
         # Store a list of songs
@@ -1768,7 +1762,7 @@ class SongStructDataObject(wx.PyDataObjectSimple):
         self.extra_data = extra_data
 
         # Pickle both songs and extra_data
-        self.data = cPickle.dumps((self.songs, self.extra_data))
+        self.data = pickle.dumps((self.songs, self.extra_data))
 
     def GetDataSize(self):
         """Returns number of bytes required to store the data in the
@@ -1791,7 +1785,7 @@ class SongStructDataObject(wx.PyDataObjectSimple):
         # Cast the data object explicitly to a str type, in case the
         # drag-and-drop operation elevated it to a unicode string.
         self.data = str(data)
-        self.songs, self.extra_data = cPickle.loads(self.data)
+        self.songs, self.extra_data = pickle.loads(self.data)
 
 # We store the object currently being dragged here, to work around an
 # apparent bug in wxPython that does not call
@@ -1904,10 +1898,10 @@ class SearchResultsPanel (wx.Panel):
         self.MaxArtistWidth = 0
 
         # Create IDs for popup menu
-        self.menuPlayId = wx.NewId()
-        self.menuPlaylistAddId = wx.NewId()
-        self.menuPlaylistEditTitlesId = wx.NewId()
-        self.menuFileDetailsId = wx.NewId()
+        self.menuPlayId = wx.NewIdRef()
+        self.menuPlaylistAddId = wx.NewIdRef()
+        self.menuPlaylistEditTitlesId = wx.NewIdRef()
+        self.menuFileDetailsId = wx.NewIdRef()
 
         # Set up drag and drop
         self.Bind(wx.EVT_LIST_BEGIN_DRAG, self._startDrag)
@@ -2289,7 +2283,7 @@ class Playlist (wx.Panel):
         self.parent = parent
 
         # Create the playlist control
-        self.PlaylistId = wx.NewId()
+        self.PlaylistId = wx.NewIdRef()
         self.Playlist = wx.ListCtrl(self, self.PlaylistId, style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.SUNKEN_BORDER)
 
         # Create the columns based on the view configuration
@@ -2322,9 +2316,9 @@ class Playlist (wx.Panel):
         wx.EVT_SIZE(self.Playlist, self.onResize)
 
         # Create IDs for popup menu
-        self.menuPlayId = wx.NewId()
-        self.menuDeleteId = wx.NewId()
-        self.menuClearListId = wx.NewId()
+        self.menuPlayId = wx.NewIdRef()
+        self.menuDeleteId = wx.NewIdRef()
+        self.menuClearListId = wx.NewIdRef()
 
         # Store a local list of song_structs associated by index to playlist items.
         # This is a list of tuples of song_struct and performer name.
@@ -3369,7 +3363,7 @@ class PyKaraokeWindow (wx.Frame):
         hsizer.Add(self.playlistButton, flag = wx.EXPAND)
 
         # Control volume of the song 1.0 = 100% volume
-        self.VolumeControlID = wx.NewId()
+        self.VolumeControlID = wx.NewIdRef()
         self.VolumeControl = wx.SpinCtrl(self.rightPanel, self.VolumeControlID, "Volume", size=(50,25))
         self.VolumeControl.SetRange(0, 100)
         self.VolumeControl.SetValue(manager.GetVolume() * 100)
@@ -3671,7 +3665,7 @@ class PyKaraokeManager:
                 manager.ValidateDatabase(self.SongDB)
                 sys.exit(0)
             else:
-                self.EVT_ERROR_POPUP = wx.NewId()
+                self.EVT_ERROR_POPUP = wx.NewIdRef()
                 self.Frame = PyKaraokeWindow(None, -1, "PyKaraoke " + pykversion.PYKARAOKE_VERSION_STRING, self)
                 self.Frame.Connect(-1, -1, self.EVT_ERROR_POPUP, self.ErrorPopupEventHandler)
                 self.SongDB.LoadDatabase(self.ErrorPopupCallback)
@@ -3782,7 +3776,7 @@ class PyKaraokeManager:
     # for the GUI thread, actually handled by ErrorPopupEventHandler()
     def ErrorPopupCallback(self, ErrorString):
         if not self.gui:
-            print ErrorString
+            print(ErrorString)
             return
         # We use the extra data storage we got by subclassing WxPyEvent to
         # pass data to the event handler (the error string).
@@ -3847,17 +3841,15 @@ def HasWx26Only ():
 
     return wx26_only
 
-
 # Subclass wx.App so that we can override the normal Wx MainLoop().
 # We only have to do this because since Wx 2.8, the MainLoop()
 # appears to be stealing all time from Pygame, and we run Pygame
 # and Wx in the same process.
 class PyKaraokeApp(wx.App):
     def MainLoop(self):
-
         # Create an event loop and make it active.
-        evtloop = wx.EventLoop()
-        wx.EventLoop.SetActive(evtloop)
+        evtloop = wx.GUIEventLoop()
+        wx.GUIEventLoop.SetActive(evtloop)
 
         # Loop forever.
         while True:
@@ -3872,7 +3864,7 @@ class PyKaraokeApp(wx.App):
             # any time spent in sleep() can steal time away from
             # pygame, especially on slower computers.
             time.sleep(0)
-            self.ProcessIdle()
+            evtloop.ProcessIdle()
 
     def OnInit(self):
         # On OSX, it's important to initialize pygame first, *before*
@@ -3887,7 +3879,7 @@ class PyKaraokeApp(wx.App):
 
 def main():
     # Display license
-    print "PyKaraoke is free software; you can redistribute it and/or\nmodify it under the terms of the GNU Lesser General Public\nLicense as published by the Free Software Foundation; either\nversion 2.1 of the License, or (at your option) any later version.\n\nPyKaraoke is distributed in the hope that it will be useful,\nbut WITHOUT ANY WARRANTY; without even the implied warranty of\nMERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\nGNU Lesser General Public License for more details.\n\nYou should have received a copy of the GNU Lesser General Public\nLicense along with this library; if not, write to the Free Software\nFoundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA\n"
+    print("PyKaraoke is free software; you can redistribute it and/or\nmodify it under the terms of the GNU Lesser General Public\nLicense as published by the Free Software Foundation; either\nversion 2.1 of the License, or (at your option) any later version.\n\nPyKaraoke is distributed in the hope that it will be useful,\nbut WITHOUT ANY WARRANTY; without even the implied warranty of\nMERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\nGNU Lesser General Public License for more details.\n\nYou should have received a copy of the GNU Lesser General Public\nLicense along with this library; if not, write to the Free Software\nFoundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA\n")
 
     MyApp = PyKaraokeApp(False)
 

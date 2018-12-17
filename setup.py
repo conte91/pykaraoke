@@ -206,8 +206,8 @@ if gotPy2exe:
             # specified '/' or some equally foolish directory as the
             # dist directory.)
             if os.path.exists(self.dist_dir):
-                print "Error, the directory %s already exists." % (self.dist_dir)
-                print "Please remove it before starting this script."
+                print("Error, the directory %s already exists." % (self.dist_dir))
+                print("Please remove it before starting this script.")
                 sys.exit(1)
 
             # Override py2exe's isSystemDLL because it erroneously
@@ -223,7 +223,7 @@ if gotPy2exe:
                 'makensis' : self.makensis,
                 'version' : pykversion.PYKARAOKE_VERSION_STRING,
                 }
-            print cmd
+            print(cmd)
             os.system(cmd)
 
             # Now that we've got an installer, we can empty the dist
@@ -240,7 +240,7 @@ if gotPy2exe:
                             os.remove(pathname)
                         except:
                             # Try to make it writable first, then remove it.
-                            os.chmod(pathname, 0666)
+                            os.chmod(pathname, 0o666)
                             os.remove(pathname)
 
                     for name in dirs:

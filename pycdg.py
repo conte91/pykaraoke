@@ -203,6 +203,9 @@ TILES_PER_COL           = 4
 TILE_WIDTH              = CDG_DISPLAY_WIDTH / TILES_PER_ROW
 TILE_HEIGHT             = CDG_DISPLAY_HEIGHT / TILES_PER_COL
 
+class CdgException(Exception):
+    pass
+
 # cdgPlayer Class
 class cdgPlayer(pykPlayer):
     # Initialise the player instace
@@ -234,7 +237,7 @@ class cdgPlayer(pykPlayer):
             if not soundFileData:
                 ErrorString = "There is no mp3 or ogg file to match " + self.Song.DisplayFilename
                 self.ErrorNotifyCallback (ErrorString)
-                raise 'NoSoundFile'
+                raise CdgException('NoSoundFile')
 
         self.cdgFileData = self.SongDatas[0]
         self.soundFileData = soundFileData
@@ -265,7 +268,7 @@ class cdgPlayer(pykPlayer):
 
         aux = aux_c
         if not aux or not manager.settings.CdgUseC:
-            print "Using Python implementation of CDG interpreter."
+            print("Using Python implementation of CDG interpreter.")
             aux = aux_python
 
         # Open the cdg and sound files
@@ -282,7 +285,7 @@ class cdgPlayer(pykPlayer):
             try:
                 manager.OpenAudio(*audioProperties)
                 audio_path = self.soundFileData.GetFilepath()
-                if type(audio_path) == unicode:
+                if type(audio_path) == str:
                     audio_path = audio_path.encode(sys.getfilesystemencoding())
                 pygame.mixer.music.load(audio_path)
             except:
@@ -485,7 +488,7 @@ class cdgPlayer(pykPlayer):
         try:
             import mutagen.mp3
         except:
-            print "Mutagen not available, will not be able to determine extra MP3 information."
+            print("Mutagen not available, will not be able to determine extra MP3 information.")
             self.soundLength = 0
             return None
 

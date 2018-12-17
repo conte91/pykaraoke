@@ -136,7 +136,7 @@ class App(pykPlayer):
         try:
             splash = pygame.image.load(splashFilename)
         except:
-            print "Unable to load splash image."
+            print("Unable to load splash image.")
             return
 
         # Put the version number up there too.
@@ -500,7 +500,7 @@ class App(pykPlayer):
 
         pathname = os.path.join (self.songDb.SaveDir, "marked.txt")
         file = open(pathname, 'w')
-        markedSongs = self.markedSongs.items()
+        markedSongs = list(self.markedSongs.items())
         markedSongs.sort()
         for key, song in markedSongs:
             line = '%s\t%s\t%s\n' % (song.DisplayFilename, song.Title, song.Artist)
@@ -885,7 +885,7 @@ class App(pykPlayer):
                 self.searchString = self.searchString[:-1]
                 self.goToSearch(self.searchString)
                 return
-            if event.unicode and event.unicode[0] >= ' ':
+            if event.str and event.str[0] >= ' ':
                 # The user has typed a keystroke that counts toward a
                 # search.
                 if event.key in self.CommandKeys:
@@ -897,7 +897,7 @@ class App(pykPlayer):
                     # haven't already started typing.
                     pass
                 else:
-                    self.searchString += event.unicode
+                    self.searchString += event.str
                     self.goToSearch(self.searchString)
                     return
             if event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
@@ -977,7 +977,7 @@ class App(pykPlayer):
         pykPlayer.handleEvent(self, event)
 
     def errorPopupCallback(self, errorString, wait = True):
-        print errorString
+        print(errorString)
 
         manager.InitPlayer(self)
         manager.OpenDisplay()

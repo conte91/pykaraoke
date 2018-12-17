@@ -67,7 +67,7 @@ class pykPlayer:
         if manager.options.dump:
             manager.options.nomusic = True
 
-        if isinstance(song, types.StringTypes):
+        if isinstance(song, (str,)):
             # We were given a filename.  Convert it to a SongStruct.
             song = self.songDb.makeSongStruct(song)
         
@@ -281,7 +281,7 @@ class pykPlayer:
             filename = self.dumpFilename
         else:
             filename = self.dumpFilename % self.PlayFrame
-            print filename
+            print(filename)
 
         if self.dumpPPM:
             # Dump a PPM file.  We do PPM by hand since pygame
@@ -376,13 +376,13 @@ class pykPlayer:
             # restore them to sync.
             elif self.State == STATE_PLAYING and event.key == pygame.K_RIGHT and event.mod & (pygame.KMOD_LCTRL | pygame.KMOD_RCTRL):
                 manager.settings.SyncDelayMs += 250
-                print "sync %s" % manager.settings.SyncDelayMs
+                print("sync %s" % manager.settings.SyncDelayMs)
             elif self.State == STATE_PLAYING and event.key == pygame.K_LEFT and event.mod & (pygame.KMOD_LCTRL | pygame.KMOD_RCTRL):
                 manager.settings.SyncDelayMs -= 250
-                print "sync %s" % manager.settings.SyncDelayMs
+                print("sync %s" % manager.settings.SyncDelayMs)
             elif self.State == STATE_PLAYING and event.key == pygame.K_DOWN and event.mod & (pygame.KMOD_LCTRL | pygame.KMOD_RCTRL):
                 manager.settings.SyncDelayMs = 0
-                print "sync %s" % manager.settings.SyncDelayMs
+                print("sync %s" % manager.settings.SyncDelayMs)
 
             if self.SupportsFontZoom:
                 if event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS or \

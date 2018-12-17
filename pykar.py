@@ -142,7 +142,7 @@ from pykconstants import *
 from pykplayer import pykPlayer
 from pykenv import env
 from pykmanager import manager
-import pygame, sys, os, struct, cStringIO
+import pygame, sys, os, struct, io
 
 # At what percentage of the screen height should we try to keep the
 # current singing cursor?  33% keeps it on the top third, 50% keeps it
@@ -393,9 +393,9 @@ class Lyrics:
                 ts.advanceToClick(track_desc.FirstNoteClick)
                 track_desc.FirstNoteMs = ts.ms
                 if debug:
-                    print "T%s first note at %s clicks, %s ms" % (
+                    print("T%s first note at %s clicks, %s ms" % (
                         track_desc.TrackNum, track_desc.FirstNoteClick,
-                        track_desc.FirstNoteMs)
+                        track_desc.FirstNoteMs))
             if track_desc.LastNoteClick != None:
                 ts.advanceToClick(track_desc.LastNoteClick)
                 track_desc.LastNoteMs = ts.ms
@@ -536,7 +536,7 @@ class Lyrics:
     def write(self):
         # Outputs the lyrics, one line at a time.
         for syllable in self.list:
-            print "%s(%s) %s %s" % (syllable.ms, syllable.click, syllable.line, repr(syllable.text))
+            print("%s(%s) %s %s" % (syllable.ms, syllable.click, syllable.line, repr(syllable.text)))
 
 def midiParseData(midiData, ErrorNotifyCallback, Encoding):
 
@@ -545,12 +545,12 @@ def midiParseData(midiData, ErrorNotifyCallback, Encoding):
     midifile.text_encoding = Encoding
 
     # Open the file
-    filehdl = cStringIO.StringIO(midiData)
+    filehdl = io.BytesIO(midiData)
 
     # Check it's a MThd chunk
     packet = filehdl.read(8)
     ChunkType, Length = struct.unpack('>4sL', packet)
-    if (ChunkType != "MThd"):
+    if (ChunkType != b"MThd"):
         ErrorNotifyCallback ("No MIDI Header chunk at start")
         return None
 
@@ -586,7 +586,7 @@ def midiParseData(midiData, ErrorNotifyCallback, Encoding):
             midifile.trackList.append(track_desc)
             # Debug out the first note for this track
             if debug:
-                print ("T%d: First note(%s)" % (trackNum, track_desc.FirstNoteClick))
+                print(("T%d: First note(%s)" % (trackNum, track_desc.FirstNoteClick)))
             trackNum = trackNum + 1
 
     # Close the open file
@@ -595,7 +595,7 @@ def midiParseData(midiData, ErrorNotifyCallback, Encoding):
     # Get the lyrics from the best track.  We prefer any tracks that
     # are "lyrics" tracks.  Failing that, we get the track with the
     # most number of syllables.
-    bestSortKey = None
+    bestSortKey = (False, 0)
     midifile.lyrics = None
 
     for track_desc in midifile.trackList:
@@ -635,17 +635,17 @@ def midiParseData(midiData, ErrorNotifyCallback, Encoding):
     lastNoteMS = None
     for track in midifile.trackList:
         if track.FirstNoteMs != None:
-            if (track.FirstNoteMs < earliestNoteMS) or (earliestNoteMS == None):
+            if (earliestNoteMS is None) or (track.FirstNoteMs < earliestNoteMS):
                 earliestNoteMS = track.FirstNoteMs
         if track.LastNoteMs != None:
-            if (track.LastNoteMs > lastNoteMS) or (lastNoteMS == None):
+            if (lastNoteMS is None) or (track.LastNoteMs > lastNoteMS):
                 lastNoteMS = track.LastNoteMs
     midifile.earliestNoteMS = earliestNoteMS
     midifile.lastNoteMS = lastNoteMS
 
     if debug:
-        print "first = %s" % (midifile.earliestNoteMS)
-        print "last = %s" % (midifile.lastNoteMS)
+        print("first = %s" % (midifile.earliestNoteMS))
+        print("last = %s" % (midifile.lastNoteMS))
 
     # Return the populated midiFile structure
     return midifile
@@ -655,7 +655,7 @@ def midiParseTrack (filehdl, midifile, trackNum, Length, ErrorNotifyCallback):
     # Create the new TrackDesc structure
     track = TrackDesc(trackNum)
     if debug:
-        print "Track %d" % trackNum
+        print("Track %d" % trackNum)
     # Loop through all events in the track, recording salient meta-events and times
     eventBytes = 0
     while track.BytesRead < Length:
@@ -708,12 +708,12 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
         bytesRead = bytesRead + 1
         event = ord(byteStr)
         if debug:
-            print "MetaEvent: 0x%X" % event
+            print("MetaEvent: 0x%X" % event)
         if event == 0x00:
             # Sequence number (discarded)
             packet = filehdl.read(2)
             bytesRead = bytesRead + 2
-            zero, type = map(ord, packet)
+            zero, type = list(map(ord, packet))
             if type == 0x02:
                 # Discard next two bytes as well
                 discard = filehdl.read(2)
@@ -722,7 +722,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
                 pass
             else:
                 if debug:
-                    print ("Invalid sequence number (%d)" % type)
+                    print(("Invalid sequence number (%d)" % type))
         elif event == 0x01:
             # Text Event
             Length, varBytes = varLength(filehdl)
@@ -732,7 +732,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
             if Length > 1000:
                 # This must be a mistake.
                 if debug:
-                    print ("Ignoring text of length %s" % (Length))
+                    print(("Ignoring text of length %s" % (Length)))
             else:
                 if (midifile.text_encoding != "") :
                     text = text.decode(midifile.text_encoding, 'replace')
@@ -741,7 +741,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
                     and ("%-" not in text) and ("%+" not in text):
                     track_desc.text_events.recordText(track_desc.TotalClicksFromStart, text)
                 if debug:
-                    print ("Text: %s" % (repr(text)))
+                    print(("Text: %s" % (repr(text))))
         elif event == 0x02:
             # Copyright (discard)
             Length, varBytes = varLength(filehdl)
@@ -755,7 +755,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
             title = filehdl.read(Length)
             bytesRead = bytesRead + Length
             if debug:
-                print ("Track Title: " + repr(title))
+                print(("Track Title: " + repr(title)))
             if title == "Words":
                 track_desc.LyricsTrack = True
         elif event == 0x04:
@@ -777,7 +777,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
                 and ("%-" not in lyric) and ("%+" not in lyric):
                 track_desc.lyric_events.recordLyric(track_desc.TotalClicksFromStart, lyric)
             if debug:
-                print ("Lyric: %s" % (repr(lyric)))
+                print(("Lyric: %s" % (repr(lyric))))
         elif event == 0x06:
             # Marker (discard)
             Length, varBytes = varLength(filehdl)
@@ -821,14 +821,14 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
             # Set Tempo
             packet = filehdl.read(4)
             bytesRead = bytesRead + 4
-            valid, tempoA, tempoB, tempoC = map(ord, packet)
+            valid, tempoA, tempoB, tempoC = packet
             if valid != 0x03:
                 print ("Error: Invalid tempo")
             tempo = (tempoA << 16) | (tempoB << 8) | tempoC
             midifile.Tempo.append((track_desc.TotalClicksFromStart, tempo))
             if debug:
                 ms_per_quarter = (tempo/1000)
-                print ("Tempo: %d (%d ms per quarter note)"% (tempo, ms_per_quarter))
+                print(("Tempo: %d (%d ms per quarter note)"% (tempo, ms_per_quarter)))
         elif event == 0x54:
             # SMPTE (discard)
             packet = filehdl.read(6)
@@ -837,9 +837,9 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
             # Meta Event: Time Signature
             packet = filehdl.read(5)
             bytesRead = bytesRead + 5
-            valid, num, denom, clocks, notes = map(ord, packet)
+            valid, num, denom, clocks, notes = packet
             if valid != 0x04:
-                print ("Error: Invalid time signature (valid=%d, num=%d, denom=%d)" % (valid,num,denom))
+                print(("Error: Invalid time signature (valid=%d, num=%d, denom=%d)" % (valid,num,denom)))
             midifile.Numerator = num
             midifile.Denominator = denom
             midifile.ClocksPerMetronomeTick = clocks
@@ -848,9 +848,9 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
             # Key signature (discard)
             packet = filehdl.read(3)
             bytesRead = bytesRead + 3
-            valid, sf, mi = map(ord, packet)
+            valid, sf, mi = list(map(ord, packet))
             if valid != 0x02:
-                print ("Error: Invalid key signature (valid=%d, sf=%d, mi=%d)" % (valid,sf,mi))
+                print(("Error: Invalid key signature (valid=%d, sf=%d, mi=%d)" % (valid,sf,mi)))
         elif event == 0x7F:
             # Sequencer Specific Meta Event
             Length, varBytes = varLength(filehdl)
@@ -868,13 +868,13 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
             data = filehdl.read(Length)
             bytesRead = bytesRead + Length
             if debug:
-                print ("Sequencer Specific Event (Data Length %d)"%Length)
-                print ("Manufacturer's ID: " + str(ID))
-                print ("Manufacturer Data: " + data)
+                print(("Sequencer Specific Event (Data Length %d)"%Length))
+                print(("Manufacturer's ID: " + str(ID)))
+                print(("Manufacturer Data: " + data))
         else:
             # Unknown event (discard)
             if debug:
-                print ("Unknown meta-event: 0x%X" % event)
+                print(("Unknown meta-event: 0x%X" % event))
             Length, varBytes = varLength(filehdl)
             bytesRead = bytesRead + varBytes
             discard = filehdl.read(Length)
@@ -902,8 +902,8 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
         packet = filehdl.read(2)
         bytesRead = bytesRead + 2
         if debug:
-            c, v = map(ord, packet)
-            print ("Control: C%d V%d" % (c,v))
+            c, v = list(map(ord, packet))
+            print(("Control: C%d V%d" % (c,v)))
     elif (event_type & 0xF0) == 0xC0:
         # Program (patch) change (discard)
         packet = filehdl.read(1)
@@ -925,7 +925,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
         end = ord(end_byte)
         bytesRead = bytesRead + Length
         if (end != 0xF7):
-            print ("Invalid F0 Sysex end byte (0x%X)" % end)
+            print(("Invalid F0 Sysex end byte (0x%X)" % end))
     elif event_type == 0xF7:
         # F7 Sysex Event (discard)
         Length, varBytes = varLength(filehdl)
@@ -935,7 +935,7 @@ def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
     else:
         # Unknown event (discard)
         if debug:
-            print ("Unknown event: 0x%x" % event_type)
+            print(("Unknown event: 0x%x" % event_type))
         Length, varBytes = varLength(filehdl)
         bytesRead = bytesRead + varBytes
         discard = filehdl.read(Length)
@@ -1048,7 +1048,7 @@ class midPlayer(pykPlayer):
         else:
             # Load the sound normally for playback.
             audio_path = self.SongDatas[0].GetFilepath()
-            if type(audio_path) == unicode:
+            if type(audio_path) == str:
                 audio_path = audio_path.encode(sys.getfilesystemencoding())
             pygame.mixer.music.load(audio_path)
 
@@ -1420,7 +1420,7 @@ class midPlayer(pykPlayer):
 
 
 def usage():
-    print "Usage:  %s <kar filename>" % os.path.basename(sys.argv[0])
+    print("Usage:  %s <kar filename>" % os.path.basename(sys.argv[0]))
 
 
 # Can be called from the command line with the CDG filepath as parameter
