@@ -273,7 +273,7 @@ class App(pykPlayer):
         # Now draw the text over everything.
         for i in range(self.numRows):
             y = self.yMargin + i * self.rowHeight
-            r = (self.currentRow + i - self.centerRow) % len(self.songDb.SongList)
+            r = int((self.currentRow + i - self.centerRow) % len(self.songDb.SongList))
             song = self.songDb.SongList[r]
             a, b, c = self.songDb.GetSongTuple(song)
                 
