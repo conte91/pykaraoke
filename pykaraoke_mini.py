@@ -885,7 +885,7 @@ class App(pykPlayer):
                 self.searchString = self.searchString[:-1]
                 self.goToSearch(self.searchString)
                 return
-            if event.str and event.str[0] >= ' ':
+            if event.unicode and event.unicode[0] >= ' ':
                 # The user has typed a keystroke that counts toward a
                 # search.
                 if event.key in self.CommandKeys:
@@ -897,7 +897,7 @@ class App(pykPlayer):
                     # haven't already started typing.
                     pass
                 else:
-                    self.searchString += event.str
+                    self.searchString += event.unicode
                     self.goToSearch(self.searchString)
                     return
             if event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
