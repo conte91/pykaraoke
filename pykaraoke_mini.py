@@ -136,7 +136,7 @@ class App(pykPlayer):
         try:
             splash = pygame.image.load(splashFilename)
         except:
-            print "Unable to load splash image."
+            print("Unable to load splash image.")
             return
 
         # Put the version number up there too.
@@ -273,7 +273,7 @@ class App(pykPlayer):
         # Now draw the text over everything.
         for i in range(self.numRows):
             y = self.yMargin + i * self.rowHeight
-            r = (self.currentRow + i - self.centerRow) % len(self.songDb.SongList)
+            r = int((self.currentRow + i - self.centerRow) % len(self.songDb.SongList))
             song = self.songDb.SongList[r]
             a, b, c = self.songDb.GetSongTuple(song)
                 
@@ -500,7 +500,7 @@ class App(pykPlayer):
 
         pathname = os.path.join (self.songDb.SaveDir, "marked.txt")
         file = open(pathname, 'w')
-        markedSongs = self.markedSongs.items()
+        markedSongs = list(self.markedSongs.items())
         markedSongs.sort()
         for key, song in markedSongs:
             line = '%s\t%s\t%s\n' % (song.DisplayFilename, song.Title, song.Artist)
@@ -878,7 +878,6 @@ class App(pykPlayer):
 
     def handleMainEvent(self, event):
         """ Handles events on the main 'select a song' index. """
-        
         if event.type == pygame.KEYDOWN:
             if self.searchString and (event.key == pygame.K_BACKSPACE or event.key == pygame.K_DELETE):
                 # Backing up on the search.
@@ -977,7 +976,7 @@ class App(pykPlayer):
         pykPlayer.handleEvent(self, event)
 
     def errorPopupCallback(self, errorString, wait = True):
-        print errorString
+        print(errorString)
 
         manager.InitPlayer(self)
         manager.OpenDisplay()

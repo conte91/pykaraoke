@@ -20,11 +20,8 @@ and functions which have been moved into C for performance reasons.
 On the off-chance a C compiler is not available or not reliable for
 some reason, you can use this implementation instead. """
 
+import numpy as N
 import pygame
-try:
-    import Numeric as N
-except ImportError:
-    import numpy.oldnumeric as N
 
 # CDG Command Code
 CDG_COMMAND             = 0x09
@@ -89,7 +86,7 @@ class CdgPacket:
 
 class CdgPacketReader:
     """ This class does the all work of reading packets from the CDG
-    file, and evaluating them to fill in pixels in a Numeric array.
+    file, and evaluating them to fill in pixels in a numpy array.
     Its public interface is in five methods. """
 
     # In this class, we are aggressive with the use of the leading
@@ -139,22 +136,22 @@ class CdgPacketReader:
         self.__vOffset = 0
         
         # Build a 306x228 array for the pixel indeces, including border area
-        self.__cdgPixelColours = N.zeros((CDG_FULL_WIDTH, CDG_FULL_HEIGHT))
+        self.__cdgPixelColours = N.zeros((CDG_FULL_WIDTH, CDG_FULL_HEIGHT), dtype=N.int64)
 
         # Build a 306x228 array for the actual RGB values. This will
         # be changed by the various commands, and blitted to the
         # screen now and again. But the border area will not be
         # blitted, only the central 288x192 area.
-        self.__cdgSurfarray = N.zeros((CDG_FULL_WIDTH, CDG_FULL_HEIGHT))
+        self.__cdgSurfarray = N.zeros((CDG_FULL_WIDTH, CDG_FULL_HEIGHT), dtype=N.int64)
 
         # Start with all tiles requiring update
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
 
     def MarkTilesDirty(self):
         """ Marks all the tiles dirty, so that the next call to
         GetDirtyTiles() will return the complete list of tiles. """
         
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
 
     def GetDirtyTiles(self):
         """ Returns a list of (row, col) tuples, corresponding to all
@@ -205,10 +202,10 @@ class CdgPacketReader:
         the pixels from the indicated tile. """
         
         # Calculate the row & column starts/ends
-        row_start = 6 + self.__hOffset + (row * TILE_WIDTH)
-        row_end = 6 + self.__hOffset + ((row + 1) * TILE_WIDTH)
-        col_start = 12 + self.__vOffset + (col * TILE_HEIGHT)
-        col_end = 12 + self.__vOffset + ((col + 1) * TILE_HEIGHT)
+        row_start = int(6 + self.__hOffset + (row * TILE_WIDTH))
+        row_end = int(6 + self.__hOffset + ((row + 1) * TILE_WIDTH))
+        col_start = int(12 + self.__vOffset + (col * TILE_HEIGHT))
+        col_end = int(12 + self.__vOffset + ((col + 1) * TILE_HEIGHT))
         pygame.surfarray.blit_array( \
             surface, \
             self.__cdgSurfarray[row_start:row_end, col_start:col_end])
@@ -219,7 +216,7 @@ class CdgPacketReader:
 
     # Read the next CDG command from the file (24 bytes each)
     def __getNextPacket(self):
-        packetData = map(ord, self.__cdgData[self.__cdgDataPos : self.__cdgDataPos + 24])
+        packetData = list(self.__cdgData[self.__cdgDataPos : self.__cdgDataPos + 24])
         self.__cdgDataPos += 24
         if (len(packetData) == 24):
             return CdgPacket(packetData)
@@ -299,7 +296,7 @@ class CdgPacketReader:
         # The most efficient way of setting the values in a Numeric
         # array, is to create a zero array and do addition on the
         # the border and preset slices.
-        self.__cdgPixelColours = N.zeros([CDG_FULL_WIDTH, CDG_FULL_HEIGHT])
+        self.__cdgPixelColours = N.zeros([CDG_FULL_WIDTH, CDG_FULL_HEIGHT], dtype=int)
         self.__cdgPixelColours[:,:] = self.__cdgPixelColours[:,:] + colour
         
         # Now set the border and preset colour in our local surfarray. 
@@ -307,7 +304,7 @@ class CdgPacketReader:
         self.__cdgSurfarray = N.zeros([CDG_FULL_WIDTH, CDG_FULL_HEIGHT])
         self.__cdgSurfarray[:,:] = self.__cdgSurfarray[:,:] + self.__cdgColourTable[colour]
 
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
 
     # Border Preset (clear the border area only) 
     def __cdgBorderPreset (self, packd):
@@ -380,7 +377,7 @@ class CdgPacketReader:
             # Changing the screen shift.
             self.__hOffset = min(hOffset, 5)
             self.__vOffset = min(vOffset, 11)
-            self.__updatedTiles = 0xFFFFFFFFL
+            self.__updatedTiles = 0xFFFFFFFF
 
         if hScrollLeftPixels == 0 and \
            hScrollRightPixels == 0 and \
@@ -428,7 +425,7 @@ class CdgPacketReader:
         
         # We have modified our local cdgSurfarray. This will be blitted to
         # the screen by cdgDisplayUpdate()
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
 
     # Set one of the colour indeces as transparent. Don't actually do anything with this
     # at the moment, as there is currently no mechanism for overlaying onto a movie file.
@@ -463,13 +460,15 @@ class CdgPacketReader:
         # new RGB surfarray from that by doing take() which translates the 0-15
         # into an RGB colour and stores them in the RGB surfarray.
         lookupTable = N.array(self.__cdgColourTable)
+        print("LUT TYPE " + str(lookupTable.dtype))
+        print("LUTs TYPE " + str(self.__cdgSurfarray.dtype))
         self.__cdgSurfarray.flat[:] = N.take(lookupTable, N.ravel(self.__cdgPixelColours))
 
         # An alternative way of doing the above - was found to be very slightly slower.
         #self.__cdgSurfarray.flat[:] =  map(self.__cdgColourTable.__getitem__, self.__cdgPixelColours.flat)
 
         # Update the screen for any colour changes
-        self.__updatedTiles = 0xFFFFFFFFL
+        self.__updatedTiles = 0xFFFFFFFF
         return
 
     # Set the colours for a 12x6 tile. The main CDG command for display data
@@ -504,11 +503,11 @@ class CdgPacketReader:
         # any update starting less than 12 rows above a block, will also
         # incorporate the block below.
 
-        firstRow = max((row_index - 6 - self.__hOffset) / TILE_WIDTH, 0)
-        lastRow = (row_index - 1 - self.__hOffset) / TILE_WIDTH
+        firstRow = max(int((row_index - 6 - self.__hOffset) / TILE_WIDTH), 0)
+        lastRow = int((row_index - 1 - self.__hOffset) / TILE_WIDTH)
 
-        firstCol = max((column_index - 12 - self.__vOffset) / TILE_HEIGHT, 0)
-        lastCol = (column_index - 1 - self.__vOffset) / TILE_HEIGHT
+        firstCol = max(int((column_index - 12 - self.__vOffset) / TILE_HEIGHT), 0)
+        lastCol = int((column_index - 1 - self.__vOffset) / TILE_HEIGHT)
 
         for col in range(firstCol, lastCol + 1):
             for row in range(firstRow, lastRow + 1):
@@ -546,6 +545,6 @@ class CdgPacketReader:
         # Now the screen has some data on it, so a subsequent clear
         # should be respected.
         self.__justClearedColourIndex = -1
-        
+
         # The changes to cdgSurfarray will be blitted on the next screen update
         return

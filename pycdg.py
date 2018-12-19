@@ -203,6 +203,9 @@ TILES_PER_COL           = 4
 TILE_WIDTH              = CDG_DISPLAY_WIDTH / TILES_PER_ROW
 TILE_HEIGHT             = CDG_DISPLAY_HEIGHT / TILES_PER_COL
 
+class CdgException(Exception):
+    pass
+
 # cdgPlayer Class
 class cdgPlayer(pykPlayer):
     # Initialise the player instace
@@ -234,7 +237,7 @@ class cdgPlayer(pykPlayer):
             if not soundFileData:
                 ErrorString = "There is no mp3 or ogg file to match " + self.Song.DisplayFilename
                 self.ErrorNotifyCallback (ErrorString)
-                raise 'NoSoundFile'
+                raise CdgException('NoSoundFile')
 
         self.cdgFileData = self.SongDatas[0]
         self.soundFileData = soundFileData
@@ -264,8 +267,8 @@ class cdgPlayer(pykPlayer):
         self.computeDisplaySize()
 
         aux = aux_c
-        if not aux or not manager.settings.CdgUseC:
-            print "Using Python implementation of CDG interpreter."
+        if aux is None or not manager.settings.CdgUseC:
+            print("Using Python implementation of CDG interpreter.")
             aux = aux_python
 
         # Open the cdg and sound files
@@ -282,7 +285,7 @@ class cdgPlayer(pykPlayer):
             try:
                 manager.OpenAudio(*audioProperties)
                 audio_path = self.soundFileData.GetFilepath()
-                if type(audio_path) == unicode:
+                if type(audio_path) == str:
                     audio_path = audio_path.encode(sys.getfilesystemencoding())
                 pygame.mixer.music.load(audio_path)
             except:
@@ -454,11 +457,11 @@ class cdgPlayer(pykPlayer):
 
         # Calculate the scaled width and height for each tile
         if manager.settings.CdgZoom == 'soft':
-            self.displayTileWidth = CDG_DISPLAY_WIDTH / TILES_PER_ROW
-            self.displayTileHeight = CDG_DISPLAY_HEIGHT / TILES_PER_COL
+            self.displayTileWidth = int(CDG_DISPLAY_WIDTH / TILES_PER_ROW)
+            self.displayTileHeight = int(CDG_DISPLAY_HEIGHT / TILES_PER_COL)
         else:
-            self.displayTileWidth = scaledWidth / TILES_PER_ROW
-            self.displayTileHeight = scaledHeight / TILES_PER_COL
+            self.displayTileWidth = int(scaledWidth / TILES_PER_ROW)
+            self.displayTileHeight = int(scaledHeight / TILES_PER_COL)
 
     def getAudioProperties(self, soundFileData):
         """ Attempts to determine the samplerate, etc., from the
@@ -485,7 +488,7 @@ class cdgPlayer(pykPlayer):
         try:
             import mutagen.mp3
         except:
-            print "Mutagen not available, will not be able to determine extra MP3 information."
+            print("Mutagen not available, will not be able to determine extra MP3 information.")
             self.soundLength = 0
             return None
 

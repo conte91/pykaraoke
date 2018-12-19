@@ -70,11 +70,11 @@ class pykManager:
 
         if env == ENV_GP2X:
             speed = cpuctrl.get_FCLK()
-            print "Initial CPU speed is %s" % (speed)
+            print("Initial CPU speed is %s" % (speed))
             x, y, tvout = cpuctrl.get_screen_info()
-            print "Initial screen size is %s, %s" % (x, y)
+            print("Initial screen size is %s, %s" % (x, y))
             if tvout:
-                print "TV-Out mode is enabled."
+                print("TV-Out mode is enabled.")
 
         # This factor may be changed by the user to make text bigger
         # or smaller on those players that support it.
@@ -105,7 +105,7 @@ class pykManager:
         try:
             volume = pygame.mixer.music.get_volume()
         except pygame.error:
-            print "Failed to raise music volume!"
+            print("Failed to raise music volume!")
             return
         volume = min(volume + 0.1, 1.0)
 
@@ -115,7 +115,7 @@ class pykManager:
         try:
             volume = pygame.mixer.music.get_volume()
         except pygame.error:
-            print "Failed to lower music volume!"
+            print("Failed to lower music volume!")
             return
         volume = max(volume - 0.1, 0.0)
 
@@ -123,7 +123,7 @@ class pykManager:
 
     def GetVolume(self):
         """ Gives the current volume level. """
-        if vars().has_key('music'):
+        if 'music' in vars():
             return pygame.mixer.music.get_volume()
         else:
             return 0.50 # 75% is the industry recommended maximum value
@@ -316,7 +316,7 @@ class pykManager:
 
     def __errorCallback(self, message):
         self.songValid = False
-        print message
+        print(message)
     def __doneCallback(self):
         pass
 
@@ -338,10 +338,10 @@ class pykManager:
                     self.songValid = False
 
             if self.songValid:
-                print '%s ok' % (song.DisplayFilename)
+                print('%s ok' % (song.DisplayFilename))
             else:
-                print '%s invalid' % (song.DisplayFilename)
-                print >> invalidFile, '%s\t%s' % (song.Filepath, song.ZipStoredName)
+                print('%s invalid' % (song.DisplayFilename))
+                print('%s\t%s' % (song.Filepath, song.ZipStoredName), file=invalidFile)
                 invalidFile.flush()
 
     def Poll(self):
@@ -423,7 +423,7 @@ class pykManager:
 
         parser.add_option('', '--zoom', metavar='MODE', dest = 'zoom_mode', type = 'choice',
                           choices = settings.Zoom,
-                          help = 'specify the way in which graphics are scaled to fit the window.  The choices are %s.' % (', '.join(map(lambda z: '"%s"' % z, settings.Zoom))),
+                          help = 'specify the way in which graphics are scaled to fit the window.  The choices are %s.' % (', '.join(['"%s"' % z for z in settings.Zoom])),
                           default = settings.CdgZoom)
 
         parser.add_option('', '--buffer', dest = 'buffer', metavar = 'MS', type = 'int',
