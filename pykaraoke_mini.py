@@ -878,7 +878,6 @@ class App(pykPlayer):
 
     def handleMainEvent(self, event):
         """ Handles events on the main 'select a song' index. """
-        
         if event.type == pygame.KEYDOWN:
             if self.searchString and (event.key == pygame.K_BACKSPACE or event.key == pygame.K_DELETE):
                 # Backing up on the search.
