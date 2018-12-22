@@ -21,7 +21,6 @@ together some common interfaces used by these different
 implementations for different types of Karaoke files."""
 
 from pykconstants import *
-from pykmanager import manager
 from pykenv import env
 import pygame
 import sys
@@ -29,7 +28,7 @@ import types
 import os
 
 class pykPlayer:
-    def __init__(self, song, songDb,
+    def __init__(self, song, songDb, manager,
                  errorNotifyCallback = None, doneCallback = None,
                  windowTitle = None):
         """The first parameter, song, may be either a pykdb.SongStruct
@@ -40,6 +39,8 @@ class pykPlayer:
             songDb = pykdb.globalSongDB
             songDb.LoadSettings(None)
         self.songDb = songDb
+
+        self.manager = manager
 
         # Set the global command-line options if they have not already
         # been set.
@@ -136,7 +137,7 @@ class pykPlayer:
     def Play(self):
         self.doPlay()
 
-        if manager.options.dump:
+        if self.manager.options.dump:
             self.setupDump()
         else:
             self.PlayStartTime = pygame.time.get_ticks()
@@ -192,7 +193,7 @@ class pykPlayer:
         if usage == None:
             usage = "%prog [options] <Karaoke file>"
 
-        return manager.SetupOptions(usage, self.songDb)
+        return self.manager.SetupOptions(usage, self.songDb)
 
     # Below methods are internal.
 
@@ -203,10 +204,10 @@ class pykPlayer:
         self.PlayFrame = 0
         self.State = STATE_CAPTURING
 
-        self.dumpFrameRate = manager.options.dump_fps
+        self.dumpFrameRate = self.manager.options.dump_fps
         assert self.dumpFrameRate
 
-        filename = manager.options.dump
+        filename = self.manager.options.dump
         base, ext = os.path.splitext(filename)
         ext_lower = ext.lower()
 
@@ -226,8 +227,8 @@ class pykPlayer:
               'gop_size': 12,
               'frame_rate_base': 125,
               'max_b_frames': 0,
-              'height': manager.options.size_y,
-              'width': manager.options.size_x,
+              'height': self.manager.options.size_y,
+              'width': self.manager.options.size_x,
               'frame_rate': frameRate,
               'deinterlace': 0,
               'bitrate': 9800000,
@@ -268,10 +269,10 @@ class pykPlayer:
         if self.dumpEncoder:
             import pymedia.video.vcodec as vcodec
 
-            ss = pygame.image.tostring(manager.surface, "RGB")
+            ss = pygame.image.tostring(self.manager.surface, "RGB")
             bmpFrame = vcodec.VFrame(
                 vcodec.formats.PIX_FMT_RGB24,
-                manager.surface.get_size(), (ss,None,None))
+                self.manager.surface.get_size(), (ss,None,None))
             yuvFrame = bmpFrame.convert(vcodec.formats.PIX_FMT_YUV420P)
             d = self.dumpEncoder.encode(yuvFrame)
             self.dumpFile.write(d.data)
@@ -288,18 +289,18 @@ class pykPlayer:
             # doesn't support it directly, but it's so easy and
             # useful.
             
-            w, h = manager.surface.get_size()
+            w, h = self.manager.surface.get_size()
             if self.dumpAppend:
                 f = open(filename, 'ab')
             else:
                 f = open(filename, 'wb')
             f.write('P6\n%s %s 255\n' % (w, h))
-            f.write(pygame.image.tostring(manager.surface, 'RGB'))
+            f.write(pygame.image.tostring(self.manager.surface, 'RGB'))
 
         else:
             # Ask pygame to dump the file.  We trust that pygame knows
             # how to store an image in the requested format.
-            pygame.image.save(manager.surface, filename)
+            pygame.image.save(self.manager.surface, filename)
             
 
     def doValidate(self):
@@ -323,8 +324,8 @@ class pykPlayer:
         # Common handling code for a close request or if the
         # pygame window was quit
         if self.State == STATE_CLOSING:
-            if manager.display:
-                manager.display.fill((0,0,0))
+            if self.manager.display:
+                self.manager.display.fill((0,0,0))
                 pygame.display.flip()
             self.shutdown()
 
@@ -375,22 +376,22 @@ class pykPlayer:
             # graphics time by 1/4 sec.  Use control-down arrow to
             # restore them to sync.
             elif self.State == STATE_PLAYING and event.key == pygame.K_RIGHT and event.mod & (pygame.KMOD_LCTRL | pygame.KMOD_RCTRL):
-                manager.settings.SyncDelayMs += 250
-                print("sync %s" % manager.settings.SyncDelayMs)
+                self.manager.settings.SyncDelayMs += 250
+                print("sync %s" % self.manager.settings.SyncDelayMs)
             elif self.State == STATE_PLAYING and event.key == pygame.K_LEFT and event.mod & (pygame.KMOD_LCTRL | pygame.KMOD_RCTRL):
-                manager.settings.SyncDelayMs -= 250
-                print("sync %s" % manager.settings.SyncDelayMs)
+                self.manager.settings.SyncDelayMs -= 250
+                print("sync %s" % self.manager.settings.SyncDelayMs)
             elif self.State == STATE_PLAYING and event.key == pygame.K_DOWN and event.mod & (pygame.KMOD_LCTRL | pygame.KMOD_RCTRL):
-                manager.settings.SyncDelayMs = 0
-                print("sync %s" % manager.settings.SyncDelayMs)
+                self.manager.settings.SyncDelayMs = 0
+                print("sync %s" % self.manager.settings.SyncDelayMs)
 
             if self.SupportsFontZoom:
                 if event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS or \
                    event.key == pygame.K_KP_PLUS:
-                    manager.ZoomFont(1.0/0.9)
+                    self.manager.ZoomFont(1.0/0.9)
                 elif event.key == pygame.K_MINUS or event.key == pygame.K_UNDERSCORE or \
                    event.key == pygame.K_KP_MINUS:
-                    manager.ZoomFont(0.9)
+                    self.manager.ZoomFont(0.9)
 
         elif event.type == pygame.QUIT:
             self.Close()
@@ -407,9 +408,9 @@ class pykPlayer:
 
             if self.SupportsFontZoom:
                 if event.button == GP2X_BUTTON_RIGHT and self.ShoulderLHeld:
-                    manager.ZoomFont(1.0/0.9)
+                    self.manager.ZoomFont(1.0/0.9)
                 elif event.button == GP2X_BUTTON_LEFT and self.ShoulderLHeld:
-                    manager.ZoomFont(0.9)
+                    self.manager.ZoomFont(0.9)
             
         elif env == ENV_GP2X and event.type == pygame.JOYBUTTONUP:
             if event.button == GP2X_BUTTON_L:
@@ -438,7 +439,7 @@ class pykPlayer:
             # The font names a specific filename.
             filename = fontData.name
             if os.path.sep not in filename:
-                filename = os.path.join(manager.FontPath, filename)
+                filename = os.path.join(self.manager.FontPath, filename)
             return pygame.font.Font(filename, fontSize)
 
         # The font names a system font.

@@ -141,7 +141,6 @@
 from pykconstants import *
 from pykplayer import pykPlayer
 from pykenv import env
-from pykmanager import manager
 import pygame, sys, os, struct, io
 
 # At what percentage of the screen height should we try to keep the
@@ -166,7 +165,10 @@ TEXT_TITLE  = 2
 debug = False
 #debug = True
 
-class midiFile:
+class MidiFile:
+    """
+    The MidiFile class can parse and process a MIDI/KAR file.
+    """
     def __init__(self):
         self.trackList = []         # List of TrackDesc track descriptors
 
@@ -447,7 +449,7 @@ class Lyrics:
                         syllable.text += ' '
 
 
-    def wordWrapLyrics(self, font):
+    def wordWrapLyrics(self, font, manager):
         # Walks through the lyrics and folds each line to the
         # indicated width.  Returns the new lyrics as a list of lists
         # of syllables; that is, each element in the returned list
@@ -967,11 +969,11 @@ def varLength(filehdl):
 
 
 class midPlayer(pykPlayer):
-    def __init__(self, song, songDb, errorNotifyCallback=None, doneCallback=None):
+    def __init__(self, song, songDb, manager, errorNotifyCallback=None, doneCallback=None):
         """The first parameter, song, may be either a pykdb.SongStruct
         instance, or it may be a filename. """
 
-        pykPlayer.__init__(self, song, songDb, errorNotifyCallback, doneCallback)
+        pykPlayer.__init__(self, song, songDb, manager, errorNotifyCallback, doneCallback)
         settings = self.songDb.Settings
 
         self.SupportsFontZoom = True
@@ -994,12 +996,11 @@ class midPlayer(pykPlayer):
         if debug:
             self.midifile.lyrics.write()
 
-        manager.setCpuSpeed('kar')
-        manager.InitPlayer(self)
-        manager.OpenDisplay()
+        self.manager.setCpuSpeed('kar')
+        self.manager.InitPlayer(self)
 
-        if not manager.options.nomusic:
-            manager.OpenAudio(frequency = manager.settings.MIDISampleRate,
+        if not self.manager.options.nomusic:
+            self.manager.OpenAudio(frequency = self.manager.settings.MIDISampleRate,
                               channels = 1)
 
         # Account for the size of the playback buffer in the lyrics
@@ -1007,7 +1008,7 @@ class midPlayer(pykPlayer):
         # slower computer that's struggling to keep up, this may not
         # be the right amount of delay, but it should usually be
         # pretty close.
-        self.InternalOffsetTime = -manager.GetAudioBufferMS()
+        self.InternalOffsetTime = -self.manager.GetAudioBufferMS()
 
         self.screenDirty = False
         self.initFont()
@@ -1025,7 +1026,7 @@ class midPlayer(pykPlayer):
             self.InternalOffsetTime += self.midifile.earliestNoteMS
 
         # Now word-wrap the text to fit our window.
-        self.lyrics = self.midifile.lyrics.wordWrapLyrics(self.font)
+        self.lyrics = self.midifile.lyrics.wordWrapLyrics(self.font, self.manager)
 
         # By default, we will use the get_pos() functionality returned
         # by pygame to get the current time through the song, to
@@ -1040,7 +1041,7 @@ class midPlayer(pykPlayer):
             self.useMidiTimer = False
 
         # Load the MIDI player
-        if manager.options.nomusic:
+        if self.manager.options.nomusic:
             # If we're not playing music, use the CPU timer instead of
             # the MIDI timer.
             self.useMidiTimer = False
@@ -1080,10 +1081,10 @@ class midPlayer(pykPlayer):
 
 
     def initFont(self):
-        fontSize = int(FONT_SIZE * manager.GetFontScale() * manager.displaySize[1] / 480.)
+        fontSize = int(FONT_SIZE * self.manager.GetFontScale() * self.manager.displaySize[1] / 480.)
         self.font = self.findPygameFont(self.songDb.Settings.KarFont, fontSize)
         self.lineSize = max(self.font.get_height(), self.font.get_linesize())
-        self.numRows = int((manager.displaySize[1] - Y_BORDER * 2) / self.lineSize)
+        self.numRows = int((self.manager.displaySize[1] - Y_BORDER * 2) / self.lineSize)
 
         # Put the current singing row at the specified fraction of the
         # screen.
@@ -1128,7 +1129,7 @@ class midPlayer(pykPlayer):
 
         # Clear the screen
         settings = self.songDb.Settings
-        manager.surface.fill(settings.KarBackgroundColour)
+        self.manager.surface.fill(settings.KarBackgroundColour)
 
         # Paint the first numRows lines
         for i in range(self.numRows):
@@ -1140,7 +1141,7 @@ class midPlayer(pykPlayer):
                     self.drawSyllable(syllable, i, None)
                     x = syllable.right
 
-        manager.Flip()
+        self.manager.Flip()
         self.screenDirty = False
 
     def drawSyllable(self, syllable, row, x):
@@ -1180,7 +1181,7 @@ class midPlayer(pykPlayer):
         width, height = text.get_size()
         syllable.right = syllable.left + width
 
-        manager.surface.blit(text, (syllable.left, y, width, height))
+        self.manager.surface.blit(text, (syllable.left, y, width, height))
 
     def __hasLyrics(self):
         """ Returns true if the midi file contains any lyrics at all,
@@ -1201,7 +1202,7 @@ class midPlayer(pykPlayer):
         return True
 
     def doPlay(self):
-        if not manager.options.nomusic:
+        if not self.manager.options.nomusic:
             pygame.mixer.music.play()
 
             # For some reason, timidity sometimes reports a bogus
@@ -1211,18 +1212,18 @@ class midPlayer(pykPlayer):
             pygame.time.wait(50)
 
     def doPause(self):
-        if not manager.options.nomusic:
+        if not self.manager.options.nomusic:
             pygame.mixer.music.pause()
 
     def doUnpause(self):
-        if not manager.options.nomusic:
+        if not self.manager.options.nomusic:
             pygame.mixer.music.unpause()
 
     def doRewind(self):
         # Reset all the state (current lyric index etc)
         self.resetPlayingState()
         # Stop the audio
-        if not manager.options.nomusic:
+        if not self.manager.options.nomusic:
             pygame.mixer.music.rewind()
             pygame.mixer.music.stop()
 
@@ -1233,8 +1234,8 @@ class midPlayer(pykPlayer):
     def shutdown(self):
         # This will be called by the pykManager to shut down the thing
         # immediately.
-        if not manager.options.nomusic:
-            if manager.audioProps:
+        if not self.manager.options.nomusic:
+            if self.manager.audioProps:
                 pygame.mixer.music.stop()
         pykPlayer.shutdown(self)
 
@@ -1243,7 +1244,7 @@ class midPlayer(pykPlayer):
         pykPlayer.doStuff(self)
 
         if self.State == STATE_PLAYING or self.State == STATE_CAPTURING:
-            self.currentMs = int(self.GetPos() + self.InternalOffsetTime + manager.settings.SyncDelayMs)
+            self.currentMs = int(self.GetPos() + self.InternalOffsetTime + self.manager.settings.SyncDelayMs)
             self.colourUpdateMs()
 
             # If we're not using the automatic midi timer, we have to
@@ -1265,7 +1266,7 @@ class midPlayer(pykPlayer):
         # request being processed, or due to the user dragging the
         # window handles.
         self.initFont()
-        self.lyrics = self.midifile.lyrics.wordWrapLyrics(self.font)
+        self.lyrics = self.midifile.lyrics.wordWrapLyrics(self.font, self.manager)
 
         self.topLine = 0
         self.currentLine = 0
@@ -1301,7 +1302,7 @@ class midPlayer(pykPlayer):
                 self.drawSyllable(syllable, line - self.topLine, x)
                 x = syllable.right
 
-            manager.Flip()
+            self.manager.Flip()
 
         return True
 
@@ -1389,16 +1390,16 @@ class midPlayer(pykPlayer):
         y = Y_BORDER + linesScrolled * self.lineSize
         h = linesRemaining * self.lineSize
         rect = pygame.Rect(X_BORDER, y,
-                           manager.displaySize[0] - X_BORDER * 2, h)
-        manager.surface.blit(manager.surface, (X_BORDER, Y_BORDER), rect)
+                           self.manager.displaySize[0] - X_BORDER * 2, h)
+        self.manager.surface.blit(self.manager.surface, (X_BORDER, Y_BORDER), rect)
 
         # And now fill the lower part of the screen with black.
         y = Y_BORDER + linesRemaining * self.lineSize
         h = linesScrolled * self.lineSize
         rect = pygame.Rect(X_BORDER, y,
-                           manager.displaySize[0] - X_BORDER * 2, h)
+                           self.manager.displaySize[0] - X_BORDER * 2, h)
         settings = self.songDb.Settings
-        manager.surface.fill(settings.KarBackgroundColour, rect)
+        self.manager.surface.fill(settings.KarBackgroundColour, rect)
 
         # We can remove any syllables from the list that might have
         # scrolled off the screen now.
@@ -1415,17 +1416,15 @@ class midPlayer(pykPlayer):
             line = self.lyrics[i]
             for syllable in line:
                 syllables.append((syllable, i))
-
         return syllables
-
 
 def usage():
     print("Usage:  %s <kar filename>" % os.path.basename(sys.argv[0]))
 
-
 # Can be called from the command line with the CDG filepath as parameter
 def main():
-    player = midPlayer(None, None)
+    manager = pykmanager.createFullscreenManager()
+    player = midPlayer(None, None, manager)
     if player.isValid:
         player.Play()
         manager.WaitForPlayer()

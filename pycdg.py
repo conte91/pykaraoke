@@ -174,7 +174,7 @@
 from pykconstants import *
 from pykplayer import pykPlayer
 from pykenv import env
-from pykmanager import manager
+import pykmanager
 import sys, pygame, os, string, math
 
 # Import the optimised C version if available, or fall back to Python
@@ -209,16 +209,16 @@ class CdgException(Exception):
 # cdgPlayer Class
 class cdgPlayer(pykPlayer):
     # Initialise the player instace
-    def __init__(self, song, songDb, errorNotifyCallback=None,
+    def __init__(self, song, songDb, manager, errorNotifyCallback=None,
                  doneCallback=None):
         """The first parameter, song, may be either a pykdb.SongStruct
         instance, or it may be a filename. """
 
-        pykPlayer.__init__(self, song, songDb, errorNotifyCallback, doneCallback)
+        pykPlayer.__init__(self, song, songDb, manager, errorNotifyCallback, doneCallback)
 
         # With the nomusic option no music will be played.
         soundFileData = None
-        if not manager.options.nomusic:
+        if not self.manager.options.nomusic:
             # Check for a matching mp3 or ogg file.  Check extensions
             # in the following order.
             validexts = [
@@ -247,13 +247,13 @@ class cdgPlayer(pykPlayer):
         # timer carries on even when the song has been paused.
         self.pauseOffsetTime = 0
 
-        manager.InitPlayer(self)
-        manager.OpenDisplay()
-        manager.surface.fill((0, 0, 0))
+        self.manager.InitPlayer(self)
+        self.manager.OpenDisplay()
+        self.manager.surface.fill((0, 0, 0))
 
         # A working surface for blitting tiles, one at a time.
         self.workingTile = pygame.Surface((TILE_WIDTH, TILE_HEIGHT),
-                                          0, manager.surface)
+                                          0, self.manager.surface)
 
         # A surface that contains the set of all tiles as they are to
         # be assembled onscreen.  This surface is kept at the original
@@ -261,29 +261,29 @@ class cdgPlayer(pykPlayer):
         # settings.CdgZoom == 'soft'.
         self.workingSurface = pygame.Surface((CDG_DISPLAY_WIDTH, CDG_DISPLAY_HEIGHT),
                                              pygame.HWSURFACE,
-                                             manager.surface)
+                                             self.manager.surface)
 
         self.borderColour = None
         self.computeDisplaySize()
 
         aux = aux_c
-        if aux is None or not manager.settings.CdgUseC:
+        if aux is None or not self.manager.settings.CdgUseC:
             print("Using Python implementation of CDG interpreter.")
             aux = aux_python
 
         # Open the cdg and sound files
         self.packetReader = aux.CdgPacketReader(self.cdgFileData.GetData(), self.workingTile)
-        manager.setCpuSpeed('cdg')
+        self.manager.setCpuSpeed('cdg')
 
         if self.soundFileData:
             # Play the music normally.
             audioProperties = None
-            if manager.settings.UseMp3Settings:
+            if self.manager.settings.UseMp3Settings:
                 audioProperties = self.getAudioProperties(self.soundFileData)
             if audioProperties == None:
                 audioProperties = (None, None, None)
             try:
-                manager.OpenAudio(*audioProperties)
+                self.manager.OpenAudio(*audioProperties)
                 audio_path = self.soundFileData.GetFilepath()
                 if type(audio_path) == str:
                     audio_path = audio_path.encode(sys.getfilesystemencoding())
@@ -300,7 +300,7 @@ class cdgPlayer(pykPlayer):
             # slower computer that's struggling to keep up, this may not
             # be the right amount of delay, but it should usually be
             # pretty close.
-            self.InternalOffsetTime = -manager.GetAudioBufferMS()
+            self.InternalOffsetTime = -self.manager.GetAudioBufferMS()
 
         else:
             # Don't play anything.
@@ -312,7 +312,7 @@ class cdgPlayer(pykPlayer):
         self.LastPos = self.curr_pos = 0
 
         # Some session-wide constants.
-        self.ms_per_update = (1000.0 / manager.options.fps)
+        self.ms_per_update = (1000.0 / self.manager.options.fps)
 
     def doPlay(self):
         if self.soundFileData:
@@ -374,7 +374,7 @@ class cdgPlayer(pykPlayer):
         # This will be called by the pykManager to shut down the thing
         # immediately.
         if self.soundFileData:
-            if manager.audioProps:
+            if self.manager.audioProps:
                 pygame.mixer.music.stop()
 
         # Make sure our surfaces are deallocated before we call up to
@@ -390,7 +390,7 @@ class cdgPlayer(pykPlayer):
         # Check whether the songfile has moved on, if so
         # get the relevant CDG data and update the screen.
         if self.State == STATE_PLAYING or self.State == STATE_CAPTURING:
-            self.curr_pos = self.GetPos() + self.InternalOffsetTime + manager.settings.SyncDelayMs - self.pauseOffsetTime
+            self.curr_pos = self.GetPos() + self.InternalOffsetTime + self.manager.settings.SyncDelayMs - self.pauseOffsetTime
 
             self.cdgPacketsDue = int((self.curr_pos * 300) / 1000)
             numPackets = self.cdgPacketsDue - self.cdgReadPackets
@@ -418,7 +418,7 @@ class cdgPlayer(pykPlayer):
         self.computeDisplaySize()
 
         if self.borderColour != None:
-            manager.surface.fill(self.borderColour)
+            self.manager.surface.fill(self.borderColour)
 
         self.packetReader.MarkTilesDirty()
 
@@ -427,15 +427,15 @@ class cdgPlayer(pykPlayer):
         tiles to the screen.  This must be called at startup, and
         whenever the window size changes. """
 
-        winWidth, winHeight = manager.displaySize
+        winWidth, winHeight = self.manager.displaySize
 
         # Compute an appropriate uniform scale to letterbox the image
         # within the window
         scale = min(float(winWidth) / CDG_DISPLAY_WIDTH,
                     float(winHeight) / CDG_DISPLAY_HEIGHT)
-        if manager.settings.CdgZoom == 'none':
+        if self.manager.settings.CdgZoom == 'none':
             scale = 1
-        elif manager.settings.CdgZoom == 'int':
+        elif self.manager.settings.CdgZoom == 'int':
             if scale < 1:
                 scale = 1.0/math.ceil(1.0/scale)
             else:
@@ -445,7 +445,7 @@ class cdgPlayer(pykPlayer):
         scaledWidth = int(scale * CDG_DISPLAY_WIDTH)
         scaledHeight = int(scale * CDG_DISPLAY_HEIGHT)
 
-        if manager.settings.CdgZoom == 'full':
+        if self.manager.settings.CdgZoom == 'full':
             # If we are allowing non-proportional scaling, allow
             # scaledWidth and scaledHeight to be independent.
             scaledWidth = winWidth
@@ -456,7 +456,7 @@ class cdgPlayer(pykPlayer):
         self.displayColOffset = (winHeight - scaledHeight) / 2
 
         # Calculate the scaled width and height for each tile
-        if manager.settings.CdgZoom == 'soft':
+        if self.manager.settings.CdgZoom == 'soft':
             self.displayTileWidth = int(CDG_DISPLAY_WIDTH / TILES_PER_ROW)
             self.displayTileHeight = int(CDG_DISPLAY_HEIGHT / TILES_PER_COL)
         else:
@@ -526,7 +526,7 @@ class cdgPlayer(pykPlayer):
         # settings.CdgZoom == 'none':
         #   No scaling.  The CDG graphics are centered within the
         #   display.  When a tile is dirty, it is blitted directly to
-        #   manager.surface.  After all dirty tiles have been blitted,
+        #   self.manager.surface.  After all dirty tiles have been blitted,
         #   we then use display.update to flip only those rectangles
         #   on the screen that have been blitted.
 
@@ -535,7 +535,7 @@ class cdgPlayer(pykPlayer):
         #   first scaled to its target scale using
         #   pygame.transform.scale(), which is quick but gives a
         #   pixelly result.  The scaled tile is then blitted to
-        #   manager.surface.
+        #   self.manager.surface.
 
         # settings.CdgZoom = 'int':
         #   The same as 'quick', but the scaling is constrained to be
@@ -554,7 +554,7 @@ class cdgPlayer(pykPlayer):
         #   after all dirty tiles have been blitted to
         #   self.workingSurface, we use pygame.transform.rotozoom() to
         #   make a nice, antialiased scaling of workingSurface to
-        #   manager.surface, and then flip the whole display.  (We
+        #   self.manager.surface, and then flip the whole display.  (We
         #   can't scale and blit the tiles one a time in this mode,
         #   since that introduces artifacts between the tile edges.)
         borderColour = self.packetReader.GetBorderColour()
@@ -563,7 +563,7 @@ class cdgPlayer(pykPlayer):
             # and redraw it.
             self.borderColour = borderColour
             if borderColour != None:
-                manager.surface.fill(borderColour)
+                self.manager.surface.fill(borderColour)
                 self.packetReader.MarkTilesDirty()
 
         dirtyTiles = self.packetReader.GetDirtyTiles()
@@ -578,15 +578,15 @@ class cdgPlayer(pykPlayer):
         for row, col in dirtyTiles:
             self.packetReader.FillTile(self.workingTile, row, col)
 
-            if manager.settings.CdgZoom == 'none':
+            if self.manager.settings.CdgZoom == 'none':
                 # The no-scale approach.
                 rect = pygame.Rect(self.displayTileWidth * row + self.displayRowOffset,
                                    self.displayTileHeight * col + self.displayColOffset,
                                    self.displayTileWidth, self.displayTileHeight)
-                manager.surface.blit(self.workingTile, rect)
+                self.manager.surface.blit(self.workingTile, rect)
                 rect_list.append(rect)
 
-            elif manager.settings.CdgZoom == 'soft':
+            elif self.manager.settings.CdgZoom == 'soft':
                 # The soft-scale approach.
                 self.workingSurface.blit(self.workingTile, (self.displayTileWidth * row, self.displayTileHeight * col))
 
@@ -596,20 +596,20 @@ class cdgPlayer(pykPlayer):
                 rect = pygame.Rect(self.displayTileWidth * row + self.displayRowOffset,
                                    self.displayTileHeight * col + self.displayColOffset,
                                    self.displayTileWidth, self.displayTileHeight)
-                manager.surface.blit(scaled, rect)
+                self.manager.surface.blit(scaled, rect)
                 rect_list.append(rect)
 
-        if manager.settings.CdgZoom == 'soft':
+        if self.manager.settings.CdgZoom == 'soft':
             # Now scale and blit the whole screen.
             scaled = pygame.transform.rotozoom(self.workingSurface, 0, self.displayScale)
-            manager.surface.blit(scaled, (self.displayRowOffset, self.displayColOffset))
-            manager.Flip()
+            self.manager.surface.blit(scaled, (self.displayRowOffset, self.displayColOffset))
+            self.manager.Flip()
         elif len(rect_list) < 24:
             # Only update those areas which have changed
-            if manager.display:
+            if self.manager.display:
                 pygame.display.update(rect_list)
         else:
-            manager.Flip()
+            self.manager.Flip()
 
 def defaultErrorPrint(ErrorString):
     print (ErrorString)
@@ -618,7 +618,7 @@ def defaultErrorPrint(ErrorString):
 def main():
     player = cdgPlayer(None, None)
     player.Play()
-    manager.WaitForPlayer()
+    pykManager.createFullscreenManager().WaitForPlayer()
 
 if __name__ == "__main__":
     sys.exit(main())

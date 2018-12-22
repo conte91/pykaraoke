@@ -21,7 +21,7 @@
 from pykconstants import *
 from pykplayer import pykPlayer
 from pykenv import env
-from pykmanager import manager
+import pykmanager
 import pygame, sys, os, string, subprocess
 import threading
 
@@ -123,28 +123,28 @@ except ImportError:
 # mpgPlayer Class
 class mpgPlayer(pykPlayer):
     # Initialise the player instace
-    def __init__(self, song, songDb, errorNotifyCallback=None, doneCallback=None):
+    def __init__(self, song, songDb, manager, errorNotifyCallback=None, doneCallback=None):
         """The first parameter, song, may be either a pykdb.SongStruct
         instance, or it may be a filename. """
 
-        pykPlayer.__init__(self, song, songDb, errorNotifyCallback, doneCallback)
+        pykPlayer.__init__(self, song, songDb, manager, errorNotifyCallback, doneCallback)
 
         self.Movie = None
 
-        manager.setCpuSpeed('mpg')
+        self.manager.setCpuSpeed('mpg')
 
-        manager.InitPlayer(self)
-        manager.OpenDisplay(depth = DISPLAY_DEPTH)
+        self.manager.InitPlayer(self)
+        self.manager.OpenDisplay(depth = DISPLAY_DEPTH)
 
         # Close the mixer while using Movie
-        manager.CloseAudio()
+        self.manager.CloseAudio()
 
         # Open the Movie module
         filepath = self.SongDatas[0].GetFilepath()
         if type(filepath) == str:
             filepath = filepath.encode(sys.getfilesystemencoding())
         self.Movie = pygame.movie.Movie(filepath)
-        self.Movie.set_display(manager.display, (0, 0, manager.displaySize[0], manager.displaySize[1]))
+        self.Movie.set_display(self.manager.display, (0, 0, self.manager.displaySize[0], self.manager.displaySize[1]))
 
 
     def doPlay(self):
@@ -200,7 +200,7 @@ class mpgPlayer(pykPlayer):
     # Internal. Only called by the pykManager.
     def doResize(self, newSize):
         # Resize the screen.
-        self.Movie.set_display(manager.display, (0, 0, manager.displaySize[0], manager.displaySize[1]))
+        self.Movie.set_display(self.manager.display, (0, 0, self.manager.displaySize[0], self.manager.displaySize[1]))
 
     # Internal. Only called by the pykManager.
     def doResizeBegin(self):
@@ -231,13 +231,13 @@ class externalPlayer(pykPlayer):
 
         self.Movie = None
 
-        manager.setCpuSpeed('mpg')
-        manager.InitPlayer(self)
+        self.manager.setCpuSpeed('mpg')
+        self.manager.InitPlayer(self)
 
         # Close the audio and the display
-        manager.CloseAudio()
-        manager.CloseDisplay()
-        manager.CloseCPUControl()
+        self.manager.CloseAudio()
+        self.manager.CloseDisplay()
+        self.manager.CloseCPUControl()
 
         self.procReturnCode = None
         self.proc = None
@@ -275,7 +275,7 @@ class externalPlayer(pykPlayer):
     def __start(self):
         filepath = self.SongDatas[0].GetFilepath()
 
-        external = manager.settings.MpgExternal
+        external = self.manager.settings.MpgExternal
         if '%' in external:
             # Assume the filename parameter is embedded in the string.
             cmd = external % {
@@ -296,7 +296,7 @@ class externalPlayer(pykPlayer):
         assert self.procReturnCode == None
         sys.stdout.flush()
         self.proc = subprocess.Popen(cmd, shell = shell)
-        if manager.settings.MpgExternalThreaded:
+        if self.manager.settings.MpgExternalThreaded:
             # Wait for it to complete in a thread.
             self.thread = threading.Thread(target = self.__runThread)
             self.thread.start()
@@ -326,7 +326,8 @@ class externalPlayer(pykPlayer):
 
 # Can be called from the command line with the MPG filepath as parameter
 def main():
-    player = mpgPlayer(None, None)
+    manager = pykmanager.createFullscreenManager()
+    player = mpgPlayer(None, None, manager)
     player.Play()
     manager.WaitForPlayer()
 

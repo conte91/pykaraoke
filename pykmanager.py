@@ -45,17 +45,19 @@ class pykManager:
     interfaces open or closed as necessary; it also provides callbacks
     into handling pygame events. """
 
-    def __init__(self):
+    def __init__(self, surface):
         self.initialized = False
         self.player = None
         self.options = None
-        self.display = None
-        self.surface = None
+        self.display = surface
+        self.surface = surface
         self.audioProps = None
 
-        self.displaySize = None
+        self.displaySize = surface.get_size()
+        print("SCREEN SIZE: {}".format(self.displaySize))
         self.displayFlags = 0
         self.displayDepth = 0
+        self.displayTitle = None
         self.cpuSpeed = None
 
         # Find the correct font path. If fully installed on Linux this
@@ -172,55 +174,6 @@ class pykManager:
                 pygame.display.set_caption(player.WindowTitle)
             except UnicodeError:
                 pygame.display.set_caption(player.WindowTitle.encode('UTF-8', 'replace'))
-
-
-    def OpenDisplay(self, displaySize = None, flags = None, depth = None):
-        """ Use this method to open a pygame display or set the
-        display to a specific mode. """
-
-        self.getDisplayDefaults()
-
-        if displaySize == None:
-            displaySize = self.displaySize
-        if flags == None:
-            flags = self.displayFlags
-        if depth == None:
-            depth = self.displayDepth
-
-        if self.options.dump:
-            # We're just capturing frames offscreen.  In that case,
-            # just open an offscreen buffer as the "display".
-            self.display = None
-            self.surface = pygame.Surface(self.displaySize)
-            self.mouseVisible = False
-            self.displaySize = self.surface.get_size()
-            self.displayFlags = self.surface.get_flags()
-            self.displayDepth = self.surface.get_bitsize()
-        else:
-            # Open the onscreen display normally.
-            pygame.display.init()
-
-            self.mouseVisible = not (env == ENV_GP2X or self.options.hide_mouse or (self.displayFlags & pygame.FULLSCREEN))
-            pygame.mouse.set_visible(self.mouseVisible)
-
-            if self.displayTitle != None:
-                pygame.display.set_caption(self.displayTitle)
-            elif self.player != None:
-                try:
-                    pygame.display.set_caption(self.player.WindowTitle)
-                except UnicodeError:
-                    pygame.display.set_caption(self.player.WindowTitle.encode('UTF-8', 'replace'))
-
-            if self.display == None or \
-               (self.displaySize, self.displayFlags, self.displayDepth) != (displaySize, flags, depth):
-                self.display = pygame.display.set_mode(displaySize, flags, depth)
-                self.displaySize = self.display.get_size()
-                self.displayFlags = flags
-                self.displayDepth = depth
-
-            self.surface = self.display
-
-        self.displayTime = pygame.time.get_ticks()
 
     def Flip(self):
         """ Call this method to make the displayed frame visible. """
@@ -629,6 +582,8 @@ class pykManager:
 
         self.mouseVisible = not (env == ENV_GP2X or self.options.hide_mouse or (self.displayFlags & pygame.FULLSCREEN))
 
+def createFullscreenManager():
+    pygame.display.init()
+    pygame.display.set_mode()
+    return pykManager(pygame.display.get_surface())
 
-# Now instantiate a global pykManager object.
-manager = pykManager()

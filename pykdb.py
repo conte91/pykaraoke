@@ -353,10 +353,9 @@ class SongStruct:
             firstWord = str.split()[0]
             if firstWord in ['a', 'an', 'the']:
                 str = str[len(firstWord):].strip()
-                
         return str
 
-    def MakePlayer(self, songDb, errorNotifyCallback, doneCallback):
+    def MakePlayer(self, songDb, manager, errorNotifyCallback, doneCallback):
         """Creates and returns a player of the appropriate type to
         play this file, if possible; or returns None if the file
         cannot be played (in which case, the errorNotifyCallback will
@@ -383,7 +382,7 @@ class SongStruct:
 
         # Try to open the song file.
         try:
-            player = constructor(self, songDb, errorNotifyCallback,
+            player = constructor(self, songDb, manager, errorNotifyCallback,
                                  doneCallback)
         except:
             errorNotifyCallback("Error opening file.\n%s\n%s" % (sys.exc_info()[0], sys.exc_info()[1]))
