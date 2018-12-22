@@ -26,10 +26,13 @@ well as the user's settings file. """
 import pygame
 from pykconstants import *
 from pykenv import env
+import filename_parse
 import pykar, pycdg, pympg
 import os, pickle, zipfile, codecs, sys, time
+import songstruct
 import traceback
 import types
+import utils
 from io import StringIO
 try:
     from hashlib import md5
@@ -174,23 +177,17 @@ class SongStruct:
         self.ZipStoredName = ZipStoredName # Filename stored in ZIP
 
         # Assume there will be no title/artist info found
-        self.Title = Title or ''    # (optional) Title for display in playlist
-        self.Artist = Artist or ''  # (optional) Artist for display
-        self.Disc = '' # (optional) Disc for display
-        self.Track = -1 # (optional) Track for display
+        self.metadata = songstruct.SongMetadata(Title=Title, Artist=Artist)
 
         # Check to see if we are deriving song information from the filename
         if settings.CdgDeriveSongInformation:
             try:
-                self.Title = self.ParseTitle(Filepath, settings)    # Title for display in playlist
-                self.Artist = self.ParseArtist(Filepath, settings)  # Artist for display
-                self.Disc = self.ParseDisc(Filepath, settings)      # Disc for display
-                self.Track = self.ParseTrack(Filepath, settings)     # Track for display
+                self.metadata = filename_parse.ParseMetadata(Filepath, settings)
             except:
                 # Filename did not match requested scheme, set the title to the filepath
                 # so that the structure is still created, but without any additional info
                 #print "Filename format does not match requested scheme: %s" % Filepath
-                self.Title = os.path.basename(Filepath)
+                self.metadata.Title = os.path.basename(Filepath)
 
                 # If this SongStruct is being used to add to the database, and we are
                 # configured to exclude non-matching files, raise an exception. Otherwise
@@ -198,7 +195,7 @@ class SongStruct:
                 # files the song will still be added to the database. For non-database
                 # adds we don't care anyway, we just want a SongStruct for passing around.
                 if DatabaseAdd and settings.ExcludeNonMatchingFilenames:
-                    raise KeyError("Excluding non-matching file: %s" % self.Title)
+                    raise KeyError("Excluding non-matching file: %s" % self.metadata.Title)
 
         # This is a list of other song files that share the same
         # artist and title data.
@@ -207,11 +204,6 @@ class SongStruct:
         # This is a pointer to the TitleStruct object that defined
         # this song file, or None if it was not defined.
         self.titles = None
-
-        # If the file ends in '.', assume we got it via tab-completion
-        # on a filename, and it really is meant to end in '.cdg'.
-        if self.Filepath != '' and self.Filepath[-1] == '.':
-            self.Filepath += 'cdg'
 
         if ZipStoredName:
             self.DisplayFilename = os.path.basename(ZipStoredName)
@@ -235,107 +227,6 @@ class SongStruct:
                 self.MpgType = 'mpg'
             else:
                 self.MpgType = ext[1:]
-
-    def ParseTitle(self, filepath, settings):
-        """ Parses the file path and returns the title of the song. If the filepath cannot be parsed a KeyError exception is thrown. If the settings contains a file naming scheme that we do not support a KeyError exception is thrown."""
-        title = ''
-        # Make sure we are to parse information
-        if settings.CdgDeriveSongInformation:
-            if settings.CdgFileNameType == 0: # Disc-Track-Artist-Title.Ext
-                # Make sure we can parse the filepath
-                if len(filepath.split("-")) == 4:
-                    title = filepath.split("-")[3] # Find the Title in the filename
-                else:
-                    raise KeyError("Invalid type for file: %s!" % filepath)
-            elif settings.CdgFileNameType == 1: # DiscTrack-Artist-Title.Ext
-                # Make sure we can parse the filepath
-                if len(filepath.split("-")) == 3:
-                    title = filepath.split("-")[2] # Find the Title in the filename
-                else:
-                    raise KeyError("Invalid type for file: %s!" % filepath)
-            elif settings.CdgFileNameType == 2: # Disc-Artist-Title.Ext
-                # Make sure we can parse the filepath
-                if len(filepath.split("-")) == 3:
-                    title = filepath.split("-")[2] # Find the Title in the filename
-                else:
-                    raise KeyError("Invalid type for file: %s!" % filepath)
-            elif settings.CdgFileNameType == 3: # Artist-Title.Ext
-                # Make sure we can parse the filepath
-                if len(filepath.split("-")) == 2:
-                    title = filepath.split("-")[1] # Find the Title in the filename
-                else:
-                    raise KeyError("Invalid type for file: %s!" % filepath)
-            else:
-                raise KeyError("File name type is invalid!")
-            # Remove the first and last space
-            title = title.strip(" ")
-            # Remove the filename extension
-            title = os.path.splitext(title)[0]
-        #print "Title parsed: %s" % title
-        return title
-
-    def ParseArtist(self, filepath, settings):
-        """ Parses the filepath and returns the artist of the song. """
-        artist = ''
-        # Make sure we are to parse information
-        if settings.CdgDeriveSongInformation:
-            if settings.CdgFileNameType == 0: # Disc-Track-Artist-Title.Ext
-                artist = filepath.split("-")[2] # Find the Artist in the filename
-            elif settings.CdgFileNameType == 1: # DiscTrack-Artist-Title.Ext
-                artist = filepath.split("-")[1] # Find the Artist in the filename
-            elif settings.CdgFileNameType == 2: # Disc-Artist-Title.Ext
-                artist = filepath.split("-")[1] # Find the Artist in the filename
-            elif settings.CdgFileNameType == 3: # Artist-Title.Ext
-                artist = filepath.split("-")[0] # Find the Artist in the filename
-                artist = os.path.basename(artist)
-            else:
-                raise KeyError("File name type is invalid!")
-            # Remove the first and last space
-            artist = artist.strip(" ")
-        #print "Artist parsed: %s" % artist
-        return artist
-
-    def ParseDisc(self, filepath, settings):
-        """ Parses the filepath and returns the disc name of the song. """
-        disc = ''
-        # Make sure we are to parse information
-        if settings.CdgDeriveSongInformation:
-            if settings.CdgFileNameType == 0: # Disc-Track-Artist-Title.Ext
-                disc = filepath.split("-")[0] # Find the Disc in the filename
-            elif settings.CdgFileNameType == 1: # DiscTrack-Artist-Title.Ext
-                disc = filepath.mid(0, filepath.length - 2) # Find the Disc in the filename
-            elif settings.CdgFileNameType == 2: # Disc-Artist-Title.Ext
-                disc = filepath.split("-")[0] # Find the Disc in the filename
-            elif settings.CdgFileNameType == 3: # Artist-Title.Ext
-                disc = ''
-            else:
-                raise KeyError("File name type is invalid!")
-            # Remove the first and last space
-            disc = disc.strip(" ")
-            # Remove the filename path
-            disc = os.path.basename(disc)
-        #print "Disc parsed: %s" % disc
-        return disc
-
-    def ParseTrack(self, filepath, settings):
-        """ Parses the file path and returns the track for the song. """
-        track = ''
-        # Make sure we are to parse information
-        if settings.CdgDeriveSongInformation:
-            if settings.CdgFileNameType == 0: # Disc-Track-Artist-Title.Ext
-                track = filepath.split("-")[1] # Find the Track in the filename
-            elif settings.CdgFileNameType == 1: # DiscTrack-Artist-Title.Ext
-                track = filepath.mid(filepath.length - 2, 2) # Find the Track in the filename
-            elif settings.CdgFileNameType == 2: # Disc-Artist-Title.Ext
-                track = ''
-            elif settings.CdgFileNameType == 3: # Artist-Title.Ext
-                track = ''
-            else:
-                raise KeyError("File name type is invalid!")
-            # Remove the first and last space
-            #track = track.strip(" ")
-        #print "Track parsed: %s" % track
-        return track
 
     def MakeSortKey(self, str):
         """ Returns a suitable key to use for sorting, by lowercasing
@@ -683,11 +574,11 @@ class TitleStruct:
                     song.titles = self
                     self.songs.append(song)
 
-                    song.Title = title.strip()
-                    song.Artist = artist.strip()
-                    if song.Title:
+                    song.metadata.Title = title.strip()
+                    song.metadata.Artist = artist.strip()
+                    if song.metadata.Title:
                         songDb.GotTitles = True
-                    if song.Artist:
+                    if song.metadata.Artist:
                         songDb.GotArtists = True
 
     def __makeRelTo(self, filename, relTo):
@@ -743,9 +634,9 @@ class TitleStruct:
 
             line = filename
             if songDb.GotTitles or songDb.GotArtists:
-                line += '\t' + song.Title
+                line += '\t' + song.metadata.Title
             if songDb.GotArtists:
-                line += '\t' + song.Artist
+                line += '\t' + song.metadata.Artist
 
             line = line.encode('utf-8')
             catalogFile.write(line + '\n')
@@ -857,10 +748,8 @@ class SettingsStruct:
         # certain hardware than others
         self.DoubleBuf = True
         self.HardwareSurface = True
-        
         self.PlayerSize = (640, 480) # Size of the karaoke player
         self.PlayerPosition = None # Initial position of the karaoke player
-        
         self.SplitVertically = True
         self.AutoPlayList = True # Enables or disables the auto play on the play-list
         self.DoubleClickPlayList = True # Enables or disables the double click for playing from the play-list
@@ -944,6 +833,9 @@ class SongDB:
         # Filepaths and titles are stored in a list of SongStruct instances
         self.FullSongList = []
 
+        # Songs sorted by artist
+        self.Artists = {}
+
         # This is the same list, with songs of the same artist/title
         # removed.
         self.UniqueSongList = []
@@ -999,7 +891,7 @@ class SongDB:
 
         # Without PYKARAOKE_DIR, use ~/.pykaraoke.  Try to figure that
         # out.
-        homeDir = self.getHomeDirectory()
+        homeDir = utils.getHomeDirectory()
         return os.path.join(homeDir, ".pykaraoke")
 
     def getTempDirectory(self):
@@ -1025,26 +917,6 @@ class SongDB:
 
         # If we can't find a good temp directory, use our save directory.
         return self.getSaveDirectory()
-
-    def getHomeDirectory(self):
-        """ Returns the user's home directory, if we can figure that
-        out. """
-
-        if env != ENV_GP2X:
-            # First attempt: ask wx, if it's available.
-            try:
-                import wx
-                return wx.GetHomeDir()
-            except:
-                pass
-
-            # Second attempt: look in $HOME
-            home = os.getenv('HOME')
-            if home:
-                return home
-
-        # Give up and return the current directory.
-        return '.'
 
     def makeSongStruct(self, filename):
         """ Creates a quick SongStruct representing the indicated
@@ -1560,8 +1432,8 @@ class SongDB:
         TermsList = LowerTerms.split()
         for song in self.FullSongList:
             yielder.ConsiderYield()
-            LowerTitle = song.Title.lower()
-            LowerArtist = song.Artist.lower()
+            LowerTitle = song.metadata.Title.lower()
+            LowerArtist = song.metadata.Artist.lower()
             LowerPath = song.DisplayFilename.lower()
             # If it's a zip file, also include the zip filename
             if song.ZipStoredName:
@@ -1712,48 +1584,52 @@ class SongDB:
         return True
 
     def getSongTupleTitleArtistFilename(self, file):
-        return (file.Title, file.Artist, file.getDisplayFilenames())
+        return (file.metadata.Title, file.metadata.Artist, file.getDisplayFilenames())
 
     def getSongTupleTitleFilenameArtist(self, file):
-        return (file.Title, file.getDisplayFilenames(), file.Artist)
+        return (file.metadata.Title, file.getDisplayFilenames(), file.metadata.Artist)
 
     def getSongTupleArtistTitleFilename(self, file):
-        return (file.Artist, file.Title, file.getDisplayFilenames())
+        return (file.metadata.Artist, file.metadata.Title, file.getDisplayFilenames())
 
     def getSongTupleArtistFilenameTitle(self, file):
-        return (file.Artist, file.getDisplayFilenames(), file.Title)
+        return (file.metadata.Artist, file.getDisplayFilenames(), file.metadata.Title)
 
     def getSongTupleFilenameTitleArtist(self, file):
-        return (file.DisplayFilename, file.Title, file.Artist)
+        return (file.DisplayFilename, file.metadata.Title, file.metadata.Artist)
 
     def getSongTupleFilenameArtistTitle(self, file):
-        return (file.DisplayFilename, file.Artist, file.Title)
+        return (file.DisplayFilename, file.metadata.Artist, file.metadata.Title)
 
     def getSongTupleTitleArtistFilenameSortKey(self, file):
-        return (file.MakeSortKey(file.Title), file.MakeSortKey(file.Artist), file.getDisplayFilenames().lower(), id(file))
+        return (file.MakeSortKey(file.metadata.Title), file.MakeSortKey(file.metadata.Artist), file.getDisplayFilenames().lower(), id(file))
 
     def getSongTupleTitleFilenameArtistSortKey(self, file):
-        return (file.MakeSortKey(file.Title), file.DisplayFilename.lower(), file.MakeSortKey(file.Artist), id(file))
+        return (file.MakeSortKey(file.metadata.Title), file.DisplayFilename.lower(), file.MakeSortKey(file.metadata.Artist), id(file))
 
     def getSongTupleArtistTitleFilenameSortKey(self, file):
-        return (file.MakeSortKey(file.Artist), file.MakeSortKey(file.Title), file.DisplayFilename.lower(), id(file))
+        return (file.MakeSortKey(file.metadata.Artist), file.MakeSortKey(file.metadata.Title), file.DisplayFilename.lower(), id(file))
 
     def getSongTupleArtistFilenameTitleSortKey(self, file):
-        return (file.MakeSortKey(file.Artist), file.DisplayFilename.lower(), file.MakeSortKey(file.Title), id(file))
+        return (file.MakeSortKey(file.metadata.Artist), file.DisplayFilename.lower(), file.MakeSortKey(file.metadata.Title), id(file))
 
     def getSongTupleFilenameTitleArtistSortKey(self, file):
-        return (file.DisplayFilename.lower(), file.MakeSortKey(file.Title), file.MakeSortKey(file.Artist), id(file))
+        return (file.DisplayFilename.lower(), file.MakeSortKey(file.metadata.Title), file.MakeSortKey(file.metadata.Artist), id(file))
 
     def getSongTupleFilenameArtistTitleSortKey(self, file):
-        return (file.DisplayFilename.lower(), file.MakeSortKey(file.Artist), file.MakeSortKey(file.Title), id(file))
+        return (file.DisplayFilename.lower(), file.MakeSortKey(file.metadata.Artist), file.MakeSortKey(file.metadata.Title), id(file))
 
     def addSong(self, file):
         self.FullSongList.append(file)
-        if file.Title:
+        if file.metadata.Title:
             self.GotTitles = True
-        if file.Artist:
+        if file.metadata.Artist:
             self.GotArtists = True
 
+        if file.metadata.Artist not in self.Artists:
+            self.Artists[file.metadata.Artist] = []
+
+        self.Artists[file.metadata.Artist].append(file)
         if hasattr(self, 'filesByFullpath'):
             # Also record the file in the temporary map by fullpath name,
             # so we can cross-reference it with a titles.txt file that
@@ -1857,7 +1733,7 @@ class SongDB:
         songsByArtistTitle = {}
 
         for song in self.FullSongList:
-            tuple = (song.Artist.lower(), song.Title.lower())
+            tuple = (song.metadata.Artist.lower(), song.metadata.Title.lower())
             songList = songsByArtistTitle.setdefault(tuple, [])
             songList.append(song)
 
