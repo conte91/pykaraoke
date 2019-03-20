@@ -138,9 +138,9 @@
 # response time.
 
 
-from pykconstants import *
-from pykplayer import pykPlayer
-from pykenv import env
+from .pykconstants import *
+from .pykplayer import pykPlayer
+from .pykenv import env
 import pygame, sys, os, struct, io
 
 # At what percentage of the screen height should we try to keep the
@@ -210,6 +210,7 @@ class TrackDesc:
         self.LastNoteMs = None          # In millseconds
         self.LyricsTrack = False        # This track contains lyrics
         self.RunningStatus = 0          # MIDI Running Status byte
+        self.Title = None
 
         self.text_events = Lyrics()       # Lyrics (0x1 events)
         self.lyric_events = Lyrics()      # Lyrics (0x5 events)
@@ -462,6 +463,7 @@ class Lyrics:
         maxWidth = manager.displaySize[0] - X_BORDER * 2
 
         lines = []
+        widths = []
 
         x = 0
         currentLine = []
@@ -477,6 +479,7 @@ class Lyrics:
             while lineNumber < syllable.line:
                 # A newline.
                 lines.append(currentLine)
+                widths.append(x)
                 x = 0
                 currentLine = []
                 currentText = ''
@@ -522,15 +525,17 @@ class Lyrics:
                 currentText = ''
                 for syllable in currentLine:
                     currentText += syllable.text
-                x, height = font.size(currentText)
+                newx, height = font.size(currentText)
+                widths.append(x - newx)
+                x = newx
 
         lines.append(currentLine)
 
         # Indicated that the first syllable of each line is flush with
         # the left edge of the screen.
-        for l in lines:
+        for l, w in zip(lines, widths):
             if l:
-                l[0].left = X_BORDER
+                l[0].left =  int(X_BORDER + (manager.displaySize[0] - w) / 2)
 
         #print lines
         return lines
@@ -541,12 +546,16 @@ class Lyrics:
             print("%s(%s) %s %s" % (syllable.ms, syllable.click, syllable.line, repr(syllable.text)))
 
 def midiParseData(midiData, ErrorNotifyCallback, Encoding):
+    """
+    Parse the content of a MIDI file according to the MIDI file format.
 
-    # Create the midiFile structure
-    midifile = midiFile()
+    See Standard MIDI-File Format Spec. 1.1, updated.
+    """
+    # Create the MidiFile structure
+    midifile = MidiFile()
     midifile.text_encoding = Encoding
 
-    # Open the file
+    # Open the buffer as a file.
     filehdl = io.BytesIO(midiData)
 
     # Check it's a MThd chunk
@@ -568,7 +577,7 @@ def midiParseData(midiData, ErrorNotifyCallback, Encoding):
     # Loop through parsing all tracks
     trackBytes = 1
     trackNum = 0
-    while (trackBytes != 0):
+    for chunkIdx in range(tracks):
         # Read the next track header
         packet = filehdl.read(8)
         if packet == "" or len(packet) < 8:
@@ -576,20 +585,24 @@ def midiParseData(midiData, ErrorNotifyCallback, Encoding):
             break
         # Check it's a MTrk
         ChunkType, Length = struct.unpack('>4sL', packet)
-        if (ChunkType != "MTrk"):
+        if (ChunkType != b"MTrk"):
+            # Unknown chunk type, ignore it.
             if debug:
                 print ("Didn't find expected MIDI Track")
+            continue
 
         # Process the track, getting a TrackDesc structure
         track_desc = midiParseTrack(filehdl, midifile, trackNum, Length, ErrorNotifyCallback)
-        if track_desc:
-            trackBytes = track_desc.BytesRead
-            # Store the track descriptor with the others
-            midifile.trackList.append(track_desc)
-            # Debug out the first note for this track
-            if debug:
-                print(("T%d: First note(%s)" % (trackNum, track_desc.FirstNoteClick)))
-            trackNum = trackNum + 1
+        if track_desc is None:
+            # Broken track
+            continue
+        trackBytes = track_desc.BytesRead
+        # Store the track descriptor with the others
+        midifile.trackList.append(track_desc)
+        # Debug out the first note for this track
+        if debug:
+            print(("T%d: First note(%s)" % (trackNum, track_desc.FirstNoteClick)))
+        trackNum = trackNum + 1
 
     # Close the open file
     filehdl.close()
@@ -649,7 +662,7 @@ def midiParseData(midiData, ErrorNotifyCallback, Encoding):
         print("first = %s" % (midifile.earliestNoteMS))
         print("last = %s" % (midifile.lastNoteMS))
 
-    # Return the populated midiFile structure
+    # Return the populated MidiFile structure
     return midifile
 
 
@@ -668,7 +681,7 @@ def midiParseTrack (filehdl, midifile, trackNum, Length, ErrorNotifyCallback):
     return track
 
 
-def midiProcessEvent (filehdl, track_desc, midifile, ErrorNotifyCallback):
+def midiProcessEvent(filehdl, track_desc, midifile, ErrorNotifyCallback):
     bytesRead = 0
     running_status = 0
     click, varBytes = varLength(filehdl)
@@ -1137,7 +1150,8 @@ class midPlayer(pykPlayer):
             x = X_BORDER
             if l < len(self.lyrics):
                 for syllable in self.lyrics[l]:
-                    syllable.left = x
+                    if syllable.left is None:
+                        syllable.left = x
                     self.drawSyllable(syllable, i, None)
                     x = syllable.right
 
@@ -1417,6 +1431,25 @@ class midPlayer(pykPlayer):
             for syllable in line:
                 syllables.append((syllable, i))
         return syllables
+
+    def getVolume(self):
+        return pygame.mixer.music.get_volume()
+
+    def volumeUp(self):
+        try:
+            volume = pygame.mixer.music.get_volume()
+            volume = min(volume + 0.1, 1.0)
+            pygame.mixer.music.set_volume(volume)
+        except pygame.error:
+            print("Failed to raise music volume!")
+
+    def volumeDown(self):
+        try:
+            volume = pygame.mixer.music.get_volume()
+            volume = max(volume - 0.1, 0.0)
+            pygame.mixer.music.set_volume(volume)
+        except pygame.error:
+            print("Failed to lower music volume!")
 
 def usage():
     print("Usage:  %s <kar filename>" % os.path.basename(sys.argv[0]))
