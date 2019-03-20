@@ -24,15 +24,15 @@
 well as the user's settings file. """
 
 import pygame
-from pykconstants import *
-from pykenv import env
-import filename_parse
-import pykar, pycdg, pympg
+from .pykconstants import *
+from .pykenv import env
+from . import filename_parse
+from . import pykar, pycdg, pympg
 import os, pickle, zipfile, codecs, sys, time
-import songstruct
+from . import songstruct
 import traceback
 import types
-import utils
+from . import utils
 from io import StringIO
 try:
     from hashlib import md5
@@ -276,6 +276,7 @@ class SongStruct:
             player = constructor(self, songDb, manager, errorNotifyCallback,
                                  doneCallback)
         except:
+            traceback.print_exc()
             errorNotifyCallback("Error opening file.\n%s\n%s" % (sys.exc_info()[0], sys.exc_info()[1]))
             return None
 
