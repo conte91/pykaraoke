@@ -20,9 +20,9 @@
 #**** Boston, MA  02111-1307  USA                                          ****
 #******************************************************************************
 
-from pykconstants import *
-from pykenv import env
-import pykversion
+from .pykconstants import *
+from .pykenv import env
+from . import pykversion
 import pygame
 import os
 import sys
@@ -60,15 +60,17 @@ class pykManager:
         self.displayTitle = None
         self.cpuSpeed = None
 
+        self.volumeChangedTicks = 60
+        self.font = pygame.font.SysFont("Sans", size=32)
+
         # Find the correct font path. If fully installed on Linux this
         # will be sys.prefix/share/pykaraoke/fonts. Otherwise look for
         # it in the current directory.
-        if (os.path.isfile("fonts/DejaVuSans.ttf")):
-            self.FontPath = "fonts"
-            self.IconPath = "icons"
-        else:
-            self.FontPath = os.path.join(sys.prefix, "share/pykaraoke/fonts")
-            self.IconPath = os.path.join(sys.prefix, "share/pykaraoke/icons")
+        thisPackageDir = os.path.abspath(os.path.dirname(__file__))
+        fontPath = os.path.join(thisPackageDir, "fonts")
+        #assert os.path.isfile(os.path.join(fontPath, "DejaVuSans.ttf"))
+        self.FontPath = fontPath
+        self.IconPath = os.path.join(thisPackageDir, "icons")
 
         if env == ENV_GP2X:
             speed = cpuctrl.get_FCLK()
@@ -104,24 +106,12 @@ class pykManager:
                 pass
 
     def VolumeUp(self):
-        try:
-            volume = pygame.mixer.music.get_volume()
-        except pygame.error:
-            print("Failed to raise music volume!")
-            return
-        volume = min(volume + 0.1, 1.0)
-
-        pygame.mixer.music.set_volume(volume)
+        if self.player:
+            self.player.volumeUp()
 
     def VolumeDown(self):
-        try:
-            volume = pygame.mixer.music.get_volume()
-        except pygame.error:
-            print("Failed to lower music volume!")
-            return
-        volume = max(volume - 0.1, 0.0)
-
-        pygame.mixer.music.set_volume(volume)
+        if self.player:
+            self.player.volumeDown()
 
     def GetVolume(self):
         """ Gives the current volume level. """
@@ -178,6 +168,7 @@ class pykManager:
     def Flip(self):
         """ Call this method to make the displayed frame visible. """
         if self.display:
+            self.drawAdditionalComponents()
             pygame.display.flip()
 
     def CloseDisplay(self):
@@ -314,9 +305,16 @@ class pykManager:
                 self.player = None
             else:
                 self.player.doStuff()
-
         # Wait a bit to save on wasteful CPU usage.
         pygame.time.wait(1)
+
+    def drawAdditionalComponents(self):
+        if self.volumeChangedTicks < 6000:
+            print("Changed")
+            volume = self.player.getVolume()
+            text = self.font.render("Volume della base: {}%".format(int(volume * 100)), True, (255, 255, 255))
+            self.surface.blit(text, (0, 0))
+            self.volumeChangedTicks += 1
 
     def WaitForPlayer(self):
         """ The interface may choose to call this method in lieu of
@@ -512,6 +510,14 @@ class pykManager:
             elif event.button == GP2X_BUTTON_VOLDOWN:
                 self.VolumeDown()
 
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP:
+                self.VolumeUp()
+                self.volumeChangedTicks = 0
+            elif event.key == pygame.K_DOWN:
+                self.VolumeDown()
+                self.volumeChangedTicks = 0
+
         if player:
             player.handleEvent(event)
 
@@ -571,7 +577,6 @@ class pykManager:
             self.displayFlags |= pygame.DOUBLEBUF
         if self.settings.HardwareSurface:
             self.displayFlags |= pygame.HWSURFACE
-        
         if self.settings.NoFrame:
             self.displayFlags |= pygame.NOFRAME
         if self.settings.FullScreen:
