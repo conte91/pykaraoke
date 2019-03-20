@@ -171,11 +171,12 @@
 # the screen into 24 segments and only update those segments
 # which have actually been updated.
 
-from pykconstants import *
-from pykplayer import pykPlayer
-from pykenv import env
-import pykmanager
+from .pykconstants import *
+from .pykplayer import pykPlayer
+from .pykenv import env
+from . import pykmanager
 import sys, pygame, os, string, math
+from . import vlc_audio
 
 # Import the optimised C version if available, or fall back to Python
 try:
@@ -248,7 +249,6 @@ class cdgPlayer(pykPlayer):
         self.pauseOffsetTime = 0
 
         self.manager.InitPlayer(self)
-        self.manager.OpenDisplay()
         self.manager.surface.fill((0, 0, 0))
 
         # A working surface for blitting tiles, one at a time.
@@ -280,20 +280,17 @@ class cdgPlayer(pykPlayer):
             audioProperties = None
             if self.manager.settings.UseMp3Settings:
                 audioProperties = self.getAudioProperties(self.soundFileData)
-            if audioProperties == None:
+            if audioProperties is None:
                 audioProperties = (None, None, None)
             try:
                 self.manager.OpenAudio(*audioProperties)
                 audio_path = self.soundFileData.GetFilepath()
-                if type(audio_path) == str:
-                    audio_path = audio_path.encode(sys.getfilesystemencoding())
-                pygame.mixer.music.load(audio_path)
+                #if type(audio_path) == str:
+                    #audio_path = audio_path.encode(sys.getfilesystemencoding())
+                self.vlcPlayer = vlc_audio.VlcAudio('file://{}'.format(os.path.abspath(audio_path)))
             except:
                 self.Close()
                 raise
-
-            # Set an event for when the music finishes playing
-            pygame.mixer.music.set_endevent(pygame.USEREVENT)
 
             # Account for the size of the playback buffer in the lyrics
             # display.  Assume that the buffer will be mostly full.  On a
@@ -316,18 +313,18 @@ class cdgPlayer(pykPlayer):
 
     def doPlay(self):
         if self.soundFileData:
-            pygame.mixer.music.play()
+            self.vlcPlayer.play()
 
     # Pause the song - Use Pause() again to unpause
     def doPause(self):
         if self.soundFileData:
-            pygame.mixer.music.pause()
+            self.vlcPlayer.pause()
             self.PauseStartTime = self.GetPos()
 
     def doUnpause(self):
         if self.soundFileData:
             self.pauseOffsetTime = self.pauseOffsetTime + (self.GetPos() - self.PauseStartTime)
-            pygame.mixer.music.unpause()
+            self.vlcPlayer.pause()
 
     # you must call Play() to restart. Blocks until pygame is initialised
     def doRewind(self):
@@ -342,8 +339,7 @@ class cdgPlayer(pykPlayer):
 
         if self.soundFileData:
             # Actually stop the audio
-            pygame.mixer.music.rewind()
-            pygame.mixer.music.stop()
+            self.vlcPlayer.stop()
 
     def GetLength(self):
         """Give the number of seconds in the song."""
@@ -353,7 +349,7 @@ class cdgPlayer(pykPlayer):
     # not initialised yet.
     def GetPos(self):
         if self.soundFileData:
-            return pygame.mixer.music.get_pos()
+            return self.vlcPlayer.getTime()
         else:
             return pykPlayer.GetPos(self)
 
@@ -375,7 +371,7 @@ class cdgPlayer(pykPlayer):
         # immediately.
         if self.soundFileData:
             if self.manager.audioProps:
-                pygame.mixer.music.stop()
+                self.vlcPlayer.stop()
 
         # Make sure our surfaces are deallocated before we call up to
         # CloseDisplay(), otherwise bad things can happen.
@@ -611,14 +607,24 @@ class cdgPlayer(pykPlayer):
         else:
             self.manager.Flip()
 
+    def volumeUp(self):
+        self.vlcPlayer.volumeUp()
+
+    def volumeDown(self):
+        self.vlcPlayer.volumeDown()
+
+    def getVolume(self):
+        return self.vlcPlayer.getVolume()
+
 def defaultErrorPrint(ErrorString):
     print (ErrorString)
 
 # Can be called from the command line with the CDG filepath as parameter
 def main():
-    player = cdgPlayer(None, None)
+    manager = pykmanager.createFullscreenManager()
+    player = cdgPlayer(None, None, manager)
     player.Play()
-    pykManager.createFullscreenManager().WaitForPlayer()
+    manager.WaitForPlayer()
 
 if __name__ == "__main__":
     sys.exit(main())
